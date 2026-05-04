@@ -23,6 +23,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly List<ModInfo> _availableMods = [];
     private readonly List<EditableModViewModel> _allEditableMods = [];
     private readonly List<ModListItemViewModel> _allModListItems = [];
+    private AppSettings _settings = new();
 
     private string? _modsFolderPath;
     private string _folderStatus = "Select your Factorio mods folder to begin.";
@@ -348,8 +349,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
-        var settings = await _appSettingsService.LoadAsync();
-        ModsFolderPath = settings.LastModsFolderPath;
+        _settings = await _appSettingsService.LoadAsync();
+        ModsFolderPath = _settings.LastModsFolderPath;
         ValidateFolder();
 
         if (IsFolderValid)
@@ -367,7 +368,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         ModsFolderPath = selected;
-        await _appSettingsService.SaveAsync(new AppSettings { LastModsFolderPath = selected });
+        if (!PathsEqual(_settings.LastModsFolderPath, selected))
+        {
+            _settings.ActiveModListFolderPath = null;
+        }
+
+        _settings.LastModsFolderPath = selected;
+        await _appSettingsService.SaveAsync(_settings);
         ValidateFolder();
         await RefreshAsync();
     }
@@ -406,10 +413,13 @@ public sealed class MainWindowViewModel : ViewModelBase
             _availableMods.AddRange(_modScanner.Scan(ModsFolderPath));
             LoadInstalledMods();
 
+            var detectedModLists = _modListDetector.Detect(ModsFolderPath).ToList();
+            var activeFolderPath = await GetValidatedRememberedActiveFolderPathAsync(detectedModLists);
+
             _allModListItems.Clear();
-            foreach (var modList in _modListDetector.Detect(ModsFolderPath))
+            foreach (var modList in detectedModLists)
             {
-                var isActive = _activeModListDetector.IsActive(ModsFolderPath, modList.FolderPath);
+                var isActive = PathsEqual(activeFolderPath, modList.FolderPath);
                 _allModListItems.Add(new ModListItemViewModel(
                     modList,
                     isActive,
@@ -686,6 +696,15 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ErrorMessage = $"Activated, but metadata could not be updated: {ex.Message}";
             }
 
+            try
+            {
+                await RememberActiveListAsync(item.FolderPath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ErrorMessage = $"Activated, but the active mod list could not be remembered: {ex.Message}";
+            }
+
             await _dialogService.ShowMessageAsync(
                 "Activation complete",
                 $"Activated {item.Name}.\nBackup created at:\n{result.BackupFolderPath}");
@@ -884,6 +903,49 @@ public sealed class MainWindowViewModel : ViewModelBase
         DraftSizeLabel = CalculateSelectedSizeLabel(selected);
     }
 
+    private async Task<string?> GetValidatedRememberedActiveFolderPathAsync(IReadOnlyList<ModList> detectedModLists)
+    {
+        var rememberedFolderPath = _settings.ActiveModListFolderPath;
+        if (string.IsNullOrWhiteSpace(rememberedFolderPath) || string.IsNullOrWhiteSpace(ModsFolderPath))
+        {
+            return null;
+        }
+
+        var rememberedList = detectedModLists.FirstOrDefault(list => PathsEqual(list.FolderPath, rememberedFolderPath));
+        if (rememberedList is not null && _activeModListDetector.IsActive(ModsFolderPath, rememberedList.FolderPath))
+        {
+            return rememberedList.FolderPath;
+        }
+
+        await ClearRememberedActiveListAsync();
+        return null;
+    }
+
+    private async Task RememberActiveListAsync(string modListFolderPath)
+    {
+        _settings.LastModsFolderPath = ModsFolderPath;
+        _settings.ActiveModListFolderPath = modListFolderPath;
+        await _appSettingsService.SaveAsync(_settings);
+    }
+
+    private async Task ClearRememberedActiveListAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_settings.ActiveModListFolderPath))
+        {
+            return;
+        }
+
+        _settings.ActiveModListFolderPath = null;
+        try
+        {
+            await _appSettingsService.SaveAsync(_settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ErrorMessage = $"The remembered active mod list is invalid, but settings could not be updated: {ex.Message}";
+        }
+    }
+
     private string CalculateSelectedSizeLabel(IEnumerable<string> selectedModNames)
     {
         var availableByName = BuildAvailableModLookup();
@@ -929,5 +991,24 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         public const string Name = "Name";
         public const string Active = "Active";
+    }
+
+    private static bool PathsEqual(string? left, string? right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        try
+        {
+            var normalizedLeft = Path.TrimEndingDirectorySeparator(Path.GetFullPath(left));
+            var normalizedRight = Path.TrimEndingDirectorySeparator(Path.GetFullPath(right));
+            return string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
     }
 }

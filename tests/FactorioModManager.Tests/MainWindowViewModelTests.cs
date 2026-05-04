@@ -104,6 +104,78 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(["Alpha Mod", "Beta Mod", "Gamma Mod"], viewModel.EditableMods.Select(mod => mod.Title));
     }
 
+    [Fact]
+    public async Task InitializeAsync_marks_only_the_remembered_matching_list_active()
+    {
+        using var temp = new TempDirectory();
+        var rememberedFolder = CreateManagedList(temp.Path, "Remembered", "Remembered active list");
+        CreateManagedList(temp.Path, "SameFiles", "Same files but not remembered");
+        CopyListFilesToRoot(temp.Path, rememberedFolder);
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings
+        {
+            LastModsFolderPath = temp.Path,
+            ActiveModListFolderPath = rememberedFolder
+        });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal("Remembered", viewModel.ActiveListName);
+        Assert.True(viewModel.ModLists.Single(list => list.Name == "Remembered").IsActive);
+        Assert.False(viewModel.ModLists.Single(list => list.Name == "SameFiles").IsActive);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_clears_remembered_active_list_when_root_files_no_longer_match()
+    {
+        using var temp = new TempDirectory();
+        var rememberedFolder = CreateManagedList(temp.Path, "Remembered", "Remembered active list");
+        File.WriteAllText(Path.Combine(temp.Path, FactorioFileNames.ModListJson), """{"mods":[{"name":"base","enabled":true}]}""");
+        File.WriteAllBytes(Path.Combine(temp.Path, FactorioFileNames.ModSettingsDat), [9, 9, 9]);
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings
+        {
+            LastModsFolderPath = temp.Path,
+            ActiveModListFolderPath = rememberedFolder
+        });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.HasActiveList);
+        Assert.All(viewModel.ModLists, list => Assert.False(list.IsActive));
+        var settings = await appSettingsService.LoadAsync();
+        Assert.Null(settings.ActiveModListFolderPath);
+    }
+
+    [Fact]
+    public async Task Activating_mod_list_remembers_it_as_active()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Path, FactorioFileNames.ModListJson), "old-root-list");
+        File.WriteAllBytes(Path.Combine(temp.Path, FactorioFileNames.ModSettingsDat), [0]);
+        var activeFolder = CreateManagedList(temp.Path, "Pack", "Pack description");
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings { LastModsFolderPath = temp.Path });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+        viewModel.SelectedModList = viewModel.ModLists.Single(list => list.Name == "Pack");
+        await viewModel.ActivateSelectedCommand.ExecuteAsync();
+
+        var settings = await appSettingsService.LoadAsync();
+        Assert.Equal(activeFolder, settings.ActiveModListFolderPath);
+        Assert.Equal("Pack", viewModel.ActiveListName);
+        Assert.True(viewModel.ModLists.Single(list => list.Name == "Pack").IsActive);
+    }
+
     private static MainWindowViewModel CreateViewModel(TestDialogService dialogService, AppSettingsService appSettingsService)
     {
         var modInfoReader = new ModInfoReader();
@@ -125,7 +197,7 @@ public sealed class MainWindowViewModelTests
             new ActiveModListDetector());
     }
 
-    private static void CreateManagedList(string root, string name, string description, params string[] selectedMods)
+    private static string CreateManagedList(string root, string name, string description, params string[] selectedMods)
     {
         if (selectedMods.Length == 0)
         {
@@ -152,5 +224,18 @@ public sealed class MainWindowViewModelTests
             selectedMods.ToDictionary(mod => mod, _ => "1.0.0"),
             null,
             null);
+        return folder;
+    }
+
+    private static void CopyListFilesToRoot(string root, string modListFolder)
+    {
+        File.Copy(
+            Path.Combine(modListFolder, FactorioFileNames.ModListJson),
+            Path.Combine(root, FactorioFileNames.ModListJson),
+            overwrite: true);
+        File.Copy(
+            Path.Combine(modListFolder, FactorioFileNames.ModSettingsDat),
+            Path.Combine(root, FactorioFileNames.ModSettingsDat),
+            overwrite: true);
     }
 }
