@@ -31,6 +31,36 @@
       <Setter Property="FontSize" Value="10" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+    <Style Selector="Button.headerSort">
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#6A604F" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.headerSort:pointerover">
+      <Setter Property="Background" Value="#221D18" />
+      <Setter Property="Foreground" Value="#A89C84" />
+    </Style>
+    <Style Selector="Button.headerSortActive">
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#F0A455" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.headerSortActive:pointerover">
+      <Setter Property="Background" Value="#221D18" />
+      <Setter Property="Foreground" Value="#F0A455" />
+    </Style>
     <Style Selector="Button">
       <Setter Property="MinHeight" Value="30" />
       <Setter Property="Padding" Value="11,5" />
@@ -72,27 +102,6 @@
       <Setter Property="Padding" Value="12,5" />
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="CornerRadius" Value="0" />
-    </Style>
-    <Style Selector="Button.segment">
-      <Setter Property="MinHeight" Value="31" />
-      <Setter Property="Padding" Value="10,4" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Background" Value="#15110D" />
-      <Setter Property="Foreground" Value="#8A7D65" />
-      <Setter Property="BorderBrush" Value="#3A342C" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="FontSize" Value="11" />
-    </Style>
-    <Style Selector="Button.segmentActive">
-      <Setter Property="MinHeight" Value="31" />
-      <Setter Property="Padding" Value="10,4" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Background" Value="#221D18" />
-      <Setter Property="Foreground" Value="#F0A455" />
-      <Setter Property="BorderBrush" Value="#D97A2C" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.path">
       <Setter Property="Background" Value="Transparent" />
@@ -337,23 +346,56 @@
           </Border>
 
           <Border Grid.Row="1" BorderBrush="#221D18" BorderThickness="0,1,0,1" Padding="18,8" IsVisible="{Binding IsEditMode}">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-              <TextBox Watermark="Search mods..." Text="{Binding SearchText, Mode=TwoWay}" />
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                <TextBlock Text="SORT" Classes="header" VerticalAlignment="Center" Margin="0,0,2,0" />
-                <Button Classes="segmentActive" Content="Name" Command="{Binding SortEditorByNameCommand}" IsVisible="{Binding IsEditorSortedByName}" />
-                <Button Classes="segment" Content="Name" Command="{Binding SortEditorByNameCommand}" IsVisible="{Binding IsEditorNotSortedByName}" />
-                <Button Classes="segmentActive" Content="Active" Command="{Binding SortEditorByActiveCommand}" IsVisible="{Binding IsEditorSortedByActive}" />
-                <Button Classes="segment" Content="Active" Command="{Binding SortEditorByActiveCommand}" IsVisible="{Binding IsEditorNotSortedByActive}" />
-              </StackPanel>
-            </Grid>
+            <TextBox Watermark="Search mods..." Text="{Binding SearchText, Mode=TwoWay}" />
           </Border>
 
           <Border Grid.Row="2" BorderBrush="#221D18" BorderThickness="0,0,0,1">
-            <Grid ColumnDefinitions="*,90,120" Margin="18,7" ColumnSpacing="12">
-              <TextBlock Classes="header" Text="" />
-              <TextBlock Grid.Column="1" Classes="header" Text="SIZE" />
-              <TextBlock Grid.Column="2" Classes="header" Text="VERSION" />
+            <Grid>
+              <Grid ColumnDefinitions="*,90,120" Margin="18,7" ColumnSpacing="12" IsVisible="{Binding IsNormalMode}">
+                <TextBlock Classes="header" Text="NAME" />
+                <TextBlock Grid.Column="1" Classes="header" Text="SIZE" />
+                <TextBlock Grid.Column="2" Classes="header" Text="VERSION" />
+              </Grid>
+              <Grid ColumnDefinitions="32,*,90,130" Margin="18,7" ColumnSpacing="12" IsVisible="{Binding IsEditMode}">
+                <Button Classes="headerSortActive"
+                        Command="{Binding SortEditorByActiveCommand}"
+                        HorizontalContentAlignment="Center"
+                        ToolTip.Tip="Sort selected mods first"
+                        IsVisible="{Binding IsEditorSortedByActive}">
+                  <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
+                    <TextBlock Text="&#x2713;" Foreground="#F0A455" FontWeight="Bold" FontSize="11" />
+                    <TextBlock Text="&#x25B2;" Foreground="#F0A455" FontSize="8" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="headerSort"
+                        Command="{Binding SortEditorByActiveCommand}"
+                        HorizontalContentAlignment="Center"
+                        ToolTip.Tip="Sort selected mods first"
+                        IsVisible="{Binding IsEditorNotSortedByActive}">
+                  <TextBlock Text="&#x2713;" Foreground="#6A604F" FontWeight="Bold" FontSize="11" />
+                </Button>
+
+                <Button Grid.Column="1"
+                        Classes="headerSortActive"
+                        Command="{Binding SortEditorByNameCommand}"
+                        ToolTip.Tip="Sort alphabetically by mod name"
+                        IsVisible="{Binding IsEditorSortedByName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="NAME" Foreground="#F0A455" FontWeight="SemiBold" FontSize="10" />
+                    <TextBlock Text="&#x25B2;" Foreground="#F0A455" FontSize="8" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="1"
+                        Classes="headerSort"
+                        Command="{Binding SortEditorByNameCommand}"
+                        ToolTip.Tip="Sort alphabetically by mod name"
+                        IsVisible="{Binding IsEditorNotSortedByName}">
+                  <TextBlock Text="NAME" Foreground="#6A604F" FontWeight="SemiBold" FontSize="10" />
+                </Button>
+
+                <TextBlock Grid.Column="2" Classes="header" Text="SIZE" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="3" Classes="header" Text="VERSION" VerticalAlignment="Center" />
+              </Grid>
             </Grid>
           </Border>
 
@@ -407,7 +449,7 @@
           </StackPanel>
           <Border Grid.Row="1" BorderBrush="#221D18" BorderThickness="0,1,0,1">
             <Grid ColumnDefinitions="*,90,130" Margin="18,7" ColumnSpacing="12">
-              <TextBlock Classes="header" Text="" />
+              <TextBlock Classes="header" Text="NAME" />
               <TextBlock Grid.Column="1" Classes="header" Text="SIZE" />
               <TextBlock Grid.Column="2" Classes="header" Text="VERSIONS" />
             </Grid>

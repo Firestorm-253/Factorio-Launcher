@@ -102,6 +102,11 @@ public sealed class MainWindowViewModelTests
         viewModel.EditableMods.Single(mod => mod.Name == "alpha-mod").IsSelected = true;
 
         Assert.Equal(["Alpha Mod", "Beta Mod", "Gamma Mod"], viewModel.EditableMods.Select(mod => mod.Title));
+
+        viewModel.SortEditorByNameCommand.Execute(null);
+
+        Assert.True(viewModel.IsEditorSortedByName);
+        Assert.Equal(["Alpha Mod", "Beta Mod", "Gamma Mod"], viewModel.EditableMods.Select(mod => mod.Title));
     }
 
     private static MainWindowViewModel CreateViewModel(TestDialogService dialogService, AppSettingsService appSettingsService)
