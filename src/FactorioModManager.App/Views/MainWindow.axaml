@@ -356,23 +356,21 @@
                 <TextBlock Grid.Column="1" Classes="header" Text="SIZE" />
                 <TextBlock Grid.Column="2" Classes="header" Text="VERSION" />
               </Grid>
-              <Grid ColumnDefinitions="32,*,90,130" Margin="18,7" ColumnSpacing="12" IsVisible="{Binding IsEditMode}">
+              <Grid ColumnDefinitions="62,*,90,130" Margin="18,7" ColumnSpacing="12" IsVisible="{Binding IsEditMode}">
                 <Button Classes="headerSortActive"
                         Command="{Binding SortEditorByActiveCommand}"
-                        HorizontalContentAlignment="Center"
                         ToolTip.Tip="Sort selected mods first"
                         IsVisible="{Binding IsEditorSortedByActive}">
-                  <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
-                    <TextBlock Text="&#x2713;" Foreground="#F0A455" FontWeight="Bold" FontSize="11" />
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="ACTIVE" Foreground="#F0A455" FontWeight="SemiBold" FontSize="10" />
                     <TextBlock Text="&#x25B2;" Foreground="#F0A455" FontSize="8" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
                 <Button Classes="headerSort"
                         Command="{Binding SortEditorByActiveCommand}"
-                        HorizontalContentAlignment="Center"
                         ToolTip.Tip="Sort selected mods first"
                         IsVisible="{Binding IsEditorNotSortedByActive}">
-                  <TextBlock Text="&#x2713;" Foreground="#6A604F" FontWeight="Bold" FontSize="11" />
+                  <TextBlock Text="ACTIVE" Foreground="#6A604F" FontWeight="SemiBold" FontSize="10" />
                 </Button>
 
                 <Button Grid.Column="1"
@@ -423,7 +421,7 @@
               <ListBox.ItemTemplate>
                 <DataTemplate>
                   <Border Classes="row" Background="{Binding RowBackground}">
-                    <Grid ColumnDefinitions="32,*,90,130" ColumnSpacing="12" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                    <Grid ColumnDefinitions="62,*,90,130" ColumnSpacing="12" VerticalAlignment="Center" HorizontalAlignment="Stretch">
                       <ToggleButton Classes="modCheck" IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="&#x2713;" VerticalAlignment="Center" />
                       <Grid Grid.Column="1" RowDefinitions="Auto,Auto" ClipToBounds="True" HorizontalAlignment="Stretch">
                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
