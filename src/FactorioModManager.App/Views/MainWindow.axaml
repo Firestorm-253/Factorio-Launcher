@@ -101,6 +101,36 @@
       <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, monospace" />
       <Setter Property="FontSize" Value="11" />
     </Style>
+    <Style Selector="ToggleButton.modCheck">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="MinWidth" Value="18" />
+      <Setter Property="MinHeight" Value="18" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="#15110D" />
+      <Setter Property="BorderBrush" Value="#6A604F" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="Transparent" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.modCheck:pointerover">
+      <Setter Property="Background" Value="#221D18" />
+      <Setter Property="BorderBrush" Value="#8A7D65" />
+    </Style>
+    <Style Selector="ToggleButton.modCheck:checked">
+      <Setter Property="Background" Value="#D97A2C" />
+      <Setter Property="BorderBrush" Value="#D97A2C" />
+      <Setter Property="Foreground" Value="#1A1814" />
+    </Style>
+    <Style Selector="ToggleButton.modCheck:checked:pointerover">
+      <Setter Property="Background" Value="#F0A455" />
+      <Setter Property="BorderBrush" Value="#F0A455" />
+      <Setter Property="Foreground" Value="#1A1814" />
+    </Style>
     <Style Selector="CheckBox /template/ Border">
       <Setter Property="Background" Value="#15110D" />
       <Setter Property="BorderBrush" Value="#3A342C" />
@@ -273,7 +303,7 @@
 
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7" VerticalAlignment="Top">
                 <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding IsNormalMode}">
-                  <Button Content="Cancel" Command="{Binding EditSelectedCommand}" />
+                  <Button Content="Edit" Command="{Binding EditSelectedCommand}" />
                   <Button Classes="danger" Content="Delete" Command="{Binding DeleteSelectedCommand}" />
                   <Button Classes="primary" Content="Activate" Command="{Binding ActivateSelectedCommand}" IsEnabled="{Binding CanActivateSelected}" />
                 </StackPanel>
@@ -308,8 +338,8 @@
                         <TextBlock Grid.Row="1" Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis" />
                       </Grid>
                       <TextBlock Grid.Column="1" Text="{Binding Size}" Classes="mono" VerticalAlignment="Center" />
-                      <Border Grid.Column="2" Background="#221D18" BorderBrush="#3A342C" BorderThickness="1" CornerRadius="4" Padding="7,3" HorizontalAlignment="Left">
-                        <TextBlock Text="{Binding DisplayVersion}" Classes="mono" />
+                      <Border Grid.Column="2" Background="#221D18" BorderBrush="#3A342C" BorderThickness="1" CornerRadius="4" Padding="7,0" Height="24" MinWidth="66" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DisplayVersion}" Classes="mono" HorizontalAlignment="Center" VerticalAlignment="Center" />
                       </Border>
                     </Grid>
                   </Border>
@@ -322,7 +352,7 @@
                 <DataTemplate>
                   <Border Classes="row" Background="{Binding RowBackground}">
                     <Grid ColumnDefinitions="32,*,90,130" ColumnSpacing="12" VerticalAlignment="Center" HorizontalAlignment="Stretch">
-                      <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" />
+                      <ToggleButton Classes="modCheck" IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="&#x2713;" VerticalAlignment="Center" />
                       <Grid Grid.Column="1" RowDefinitions="Auto,Auto" ClipToBounds="True" HorizontalAlignment="Stretch">
                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Row="1" Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis" />

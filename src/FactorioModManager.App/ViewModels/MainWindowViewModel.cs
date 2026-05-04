@@ -640,8 +640,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         var confirmed = await _dialogService.ConfirmAsync(
             "Activate mod list",
-            $"Activate {item.Name}? Current root mod-list.json and mod-settings.dat will be backed up first.",
-            "Activate");
+            $"Activate {item.Name}?",
+            "Confirm");
         if (!confirmed)
         {
             return;
