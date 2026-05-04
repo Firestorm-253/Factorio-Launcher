@@ -15,14 +15,15 @@ public sealed class ModListDetector
 
     public IReadOnlyList<ModList> Detect(string modsFolderPath)
     {
-        if (!Directory.Exists(modsFolderPath))
+        var listsRoot = ManagerWorkspacePaths.GetListsRoot(modsFolderPath);
+        if (!Directory.Exists(listsRoot))
         {
             return [];
         }
 
         try
         {
-            return Directory.EnumerateDirectories(modsFolderPath, "*", SearchOption.TopDirectoryOnly)
+            return Directory.EnumerateDirectories(listsRoot, "*", SearchOption.TopDirectoryOnly)
                 .Where(IsManagedListFolder)
                 .Select(CreateModList)
                 .OrderBy(list => list.Name, StringComparer.CurrentCultureIgnoreCase)

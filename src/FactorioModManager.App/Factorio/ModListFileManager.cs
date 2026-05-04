@@ -4,7 +4,7 @@ public sealed class ModListFileManager
 {
     public string CreateManagedListFolder(string modsFolderPath, string name)
     {
-        var folderPath = Path.Combine(modsFolderPath, name);
+        var folderPath = ManagerWorkspacePaths.GetManagedListFolder(modsFolderPath, name);
         if (Directory.Exists(folderPath))
         {
             throw new IOException("A folder with this mod-list name already exists.");
@@ -16,13 +16,13 @@ public sealed class ModListFileManager
 
     public string RenameManagedList(string modsFolderPath, string currentFolderPath, string newName)
     {
-        if (!ModListActivator.IsImmediateChild(modsFolderPath, currentFolderPath) ||
+        if (!ManagerWorkspacePaths.IsManagedListPath(modsFolderPath, currentFolderPath) ||
             !ModListDetector.IsManagedListFolder(currentFolderPath))
         {
             throw new InvalidOperationException("Only recognized managed mod-list folders can be renamed.");
         }
 
-        var destination = Path.Combine(modsFolderPath, newName);
+        var destination = ManagerWorkspacePaths.GetManagedListFolder(modsFolderPath, newName);
         if (Directory.Exists(destination))
         {
             throw new IOException("A folder with this mod-list name already exists.");
@@ -34,7 +34,7 @@ public sealed class ModListFileManager
 
     public void DeleteManagedList(string modsFolderPath, string folderPath)
     {
-        if (!ModListActivator.IsImmediateChild(modsFolderPath, folderPath) ||
+        if (!ManagerWorkspacePaths.IsManagedListPath(modsFolderPath, folderPath) ||
             !ModListDetector.IsManagedListFolder(folderPath))
         {
             throw new InvalidOperationException("Only recognized managed mod-list folders can be deleted.");

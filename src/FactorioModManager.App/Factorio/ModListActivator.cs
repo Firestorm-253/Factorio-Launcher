@@ -23,9 +23,9 @@ public sealed class ModListActivator
                 return Failure("The Factorio mods folder does not exist.", backupFolder, rootFilesModified);
             }
 
-            if (!IsImmediateChild(modsFolderPath, modListFolderPath))
+            if (!ManagerWorkspacePaths.IsManagedListPath(modsFolderPath, modListFolderPath))
             {
-                return Failure("The selected mod list is not inside the selected mods folder.", backupFolder, rootFilesModified);
+                return Failure("The selected mod list is not inside the manager lists folder.", backupFolder, rootFilesModified);
             }
 
             if (!ModListDetector.IsManagedListFolder(modListFolderPath))
@@ -81,8 +81,6 @@ public sealed class ModListActivator
 
     internal static bool IsImmediateChild(string parentFolder, string childFolder)
     {
-        var parent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parentFolder));
-        var child = Path.TrimEndingDirectorySeparator(Path.GetFullPath(childFolder));
-        return string.Equals(Path.GetDirectoryName(child), parent, StringComparison.OrdinalIgnoreCase);
+        return ManagerWorkspacePaths.IsImmediateChild(parentFolder, childFolder);
     }
 }

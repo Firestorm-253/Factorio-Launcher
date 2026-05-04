@@ -36,11 +36,11 @@ public sealed class NameValidator
             return NameValidationResult.Invalid("Names cannot use path traversal.");
         }
 
-        var destination = Path.GetFullPath(Path.Combine(modsFolderPath, trimmed));
-        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(modsFolderPath));
-        if (!string.Equals(Path.GetDirectoryName(destination), root, StringComparison.OrdinalIgnoreCase))
+        var listsRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(ManagerWorkspacePaths.GetListsRoot(modsFolderPath)));
+        var destination = Path.GetFullPath(ManagerWorkspacePaths.GetManagedListFolder(modsFolderPath, trimmed));
+        if (!string.Equals(Path.GetDirectoryName(destination), listsRoot, StringComparison.OrdinalIgnoreCase))
         {
-            return NameValidationResult.Invalid("Name must resolve inside the selected mods folder.");
+            return NameValidationResult.Invalid("Name must resolve inside the manager lists folder.");
         }
 
         var duplicate = existingNames.Any(existing =>

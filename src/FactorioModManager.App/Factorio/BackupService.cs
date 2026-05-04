@@ -17,7 +17,7 @@ public sealed class BackupService
             throw new FileNotFoundException("Root mod-settings.dat is missing.", rootModSettings);
         }
 
-        var backupRoot = Path.Combine(modsFolderPath, FactorioFileNames.BackupRootFolder);
+        var backupRoot = ManagerWorkspacePaths.GetBackupsRoot(modsFolderPath);
         Directory.CreateDirectory(backupRoot);
 
         var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");

@@ -15,8 +15,12 @@ public sealed class ModListDetectorTests
             new Dictionary<string, string> { ["space-exploration"] = "0.6.128" },
             null,
             null);
-        Directory.CreateDirectory(Path.Combine(temp.Path, "Incomplete"));
-        File.WriteAllText(Path.Combine(temp.Path, "Incomplete", FactorioFileNames.ModListJson), "{}");
+        Directory.CreateDirectory(ManagerWorkspacePaths.GetManagedListFolder(temp.Path, "Incomplete"));
+        File.WriteAllText(Path.Combine(ManagerWorkspacePaths.GetManagedListFolder(temp.Path, "Incomplete"), FactorioFileNames.ModListJson), "{}");
+        var legacyRootFolder = Path.Combine(temp.Path, "LegacyRootFolder");
+        Directory.CreateDirectory(legacyRootFolder);
+        File.WriteAllText(Path.Combine(legacyRootFolder, FactorioFileNames.ModListJson), """{"mods":[]}""");
+        File.WriteAllBytes(Path.Combine(legacyRootFolder, FactorioFileNames.ModSettingsDat), [4, 5, 6]);
 
         var results = new ModListDetector(new ModListReader(), new ModListMetadataService()).Detect(temp.Path);
 
@@ -28,7 +32,7 @@ public sealed class ModListDetectorTests
 
     private static string CreateManagedList(string root, string name)
     {
-        var folder = Path.Combine(root, name);
+        var folder = ManagerWorkspacePaths.GetManagedListFolder(root, name);
         Directory.CreateDirectory(folder);
         File.WriteAllText(Path.Combine(folder, FactorioFileNames.ModListJson), """{"mods":[]}""");
         File.WriteAllBytes(Path.Combine(folder, FactorioFileNames.ModSettingsDat), [1, 2, 3]);

@@ -15,7 +15,7 @@ public sealed class MainWindowViewModelTests
         ModScannerTests.CreateZip(Path.Combine(temp.Path, "duplicate-mod_1.0.0.zip"), "duplicate-mod", "Duplicate Mod", "1.0.0", "Author", "Old");
         ModScannerTests.CreateZip(Path.Combine(temp.Path, "duplicate-mod_1.1.0.zip"), "duplicate-mod", "Duplicate Mod", "1.1.0", "Author", "New");
 
-        var listFolder = Path.Combine(temp.Path, "Created");
+        var listFolder = ManagerWorkspacePaths.GetManagedListFolder(temp.Path, "Created");
         Directory.CreateDirectory(listFolder);
         File.WriteAllText(Path.Combine(listFolder, FactorioFileNames.ModListJson), """
         {
@@ -204,7 +204,7 @@ public sealed class MainWindowViewModelTests
             selectedMods = ["space-exploration"];
         }
 
-        var folder = Path.Combine(root, name);
+        var folder = ManagerWorkspacePaths.GetManagedListFolder(root, name);
         Directory.CreateDirectory(folder);
         var modEntries = string.Join(
             $",{Environment.NewLine}",
