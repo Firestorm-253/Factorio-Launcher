@@ -35,7 +35,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string? _searchText;
     private string? _listSearchText;
     private string _activeTab = "Lists";
-    private string _editorSortMode = EditorSortModes.Name;
+    private string _editorSortMode = EditorSortModes.Active;
     private string _draftName = string.Empty;
     private string _draftDescription = string.Empty;
     private int _draftSelectedCount;
@@ -498,7 +498,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         SearchText = string.Empty;
-        EditorSortMode = EditorSortModes.Name;
+        EditorSortMode = EditorSortModes.Active;
         IsEditMode = true;
         ApplyEditorFilter();
         UpdateDraftSummary();

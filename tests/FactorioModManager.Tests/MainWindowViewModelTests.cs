@@ -91,11 +91,6 @@ public sealed class MainWindowViewModelTests
         await viewModel.InitializeAsync();
         viewModel.EditSelectedCommand.Execute(null);
 
-        Assert.True(viewModel.IsEditorSortedByName);
-        Assert.Equal(["Alpha Mod", "Beta Mod", "Gamma Mod"], viewModel.EditableMods.Select(mod => mod.Title));
-
-        viewModel.SortEditorByActiveCommand.Execute(null);
-
         Assert.True(viewModel.IsEditorSortedByActive);
         Assert.Equal(["Beta Mod", "Alpha Mod", "Gamma Mod"], viewModel.EditableMods.Select(mod => mod.Title));
 
