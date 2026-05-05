@@ -287,6 +287,74 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SaveEdit_keeps_active_list_active_and_updates_root_files()
+    {
+        using var temp = new TempDirectory();
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "alpha-mod_1.0.0.zip"), "alpha-mod", "Alpha", "1.0.0");
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "beta-mod_1.0.0.zip"), "beta-mod", "Beta", "1.0.0");
+        var packFolder = CreateManagedList(temp.Path, "Pack", "Active pack", "alpha-mod");
+        CopyListFilesToRoot(temp.Path, packFolder);
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings
+        {
+            LastModsFolderPath = temp.Path,
+            ActiveModListFolderPath = packFolder
+        });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+        Assert.Equal("Pack", viewModel.ActiveListName);
+        Assert.True(viewModel.ModLists.Single(list => list.Name == "Pack").IsActive);
+
+        viewModel.SelectedModList = viewModel.ModLists.Single(list => list.Name == "Pack");
+        viewModel.EditSelectedCommand.Execute(null);
+        viewModel.EditableMods.Single(mod => mod.Name == "beta-mod").IsSelected = true;
+
+        await viewModel.SaveEditCommand.ExecuteAsync();
+
+        Assert.Equal("Pack", viewModel.ActiveListName);
+        Assert.True(viewModel.ModLists.Single(list => list.Name == "Pack").IsActive);
+
+        var rootMods = new ModListReader().ReadSelectedMods(temp.Path);
+        Assert.Contains("alpha-mod", rootMods);
+        Assert.Contains("beta-mod", rootMods);
+
+        var settings = await appSettingsService.LoadAsync();
+        Assert.Equal(packFolder, settings.ActiveModListFolderPath);
+    }
+
+    [Fact]
+    public async Task SaveEdit_does_not_activate_an_inactive_list()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Path, FactorioFileNames.ModListJson), """{"mods":[{"name":"base","enabled":true}]}""");
+        File.WriteAllBytes(Path.Combine(temp.Path, FactorioFileNames.ModSettingsDat), [9, 9, 9]);
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "alpha-mod_1.0.0.zip"), "alpha-mod", "Alpha", "1.0.0");
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "beta-mod_1.0.0.zip"), "beta-mod", "Beta", "1.0.0");
+        CreateManagedList(temp.Path, "Pack", "Inactive pack", "alpha-mod");
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings { LastModsFolderPath = temp.Path });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+        Assert.Null(viewModel.ActiveListName);
+
+        viewModel.SelectedModList = viewModel.ModLists.Single(list => list.Name == "Pack");
+        viewModel.EditSelectedCommand.Execute(null);
+        viewModel.EditableMods.Single(mod => mod.Name == "beta-mod").IsSelected = true;
+
+        await viewModel.SaveEditCommand.ExecuteAsync();
+
+        Assert.Null(viewModel.ActiveListName);
+        Assert.False(viewModel.ModLists.Single(list => list.Name == "Pack").IsActive);
+        Assert.Equal([9, 9, 9], File.ReadAllBytes(Path.Combine(temp.Path, FactorioFileNames.ModSettingsDat)));
+    }
+
+    [Fact]
     public async Task SelectActiveListCommand_switches_to_lists_and_selects_active_list()
     {
         using var temp = new TempDirectory();

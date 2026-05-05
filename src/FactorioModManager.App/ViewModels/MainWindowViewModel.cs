@@ -697,6 +697,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        var wasActive = SelectedModList.IsActive;
+
         try
         {
             var targetFolder = SelectedModList.FolderPath;
@@ -714,17 +716,58 @@ public sealed class MainWindowViewModel : ViewModelBase
                 SelectedModList.ModList.CreatedUtc,
                 SelectedModList.ModList.LastActivatedUtc);
 
+            var reactivated = false;
+            string? reactivationWarning = null;
+            if (wasActive)
+            {
+                (reactivated, reactivationWarning) = await TryReactivateAfterSaveAsync(targetFolder);
+            }
+
             FinishEditing();
-            StatusMessage = $"Saved {newName}.";
+            StatusMessage = reactivated ? $"Saved and re-activated {newName}." : $"Saved {newName}.";
             await RefreshAsync();
             SelectedModList = _allModListItems.FirstOrDefault(item =>
                 string.Equals(item.Name, newName, StringComparison.OrdinalIgnoreCase));
+            if (reactivationWarning is not null)
+            {
+                ErrorMessage = reactivationWarning;
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             ErrorMessage = ex.Message;
             await _dialogService.ShowErrorAsync("Save failed", ex.Message);
         }
+    }
+
+    private async Task<(bool reactivated, string? warning)> TryReactivateAfterSaveAsync(string targetFolder)
+    {
+        var result = _modListActivator.Activate(ModsFolderPath!, targetFolder);
+        if (!result.Success)
+        {
+            return (false, $"Saved, but re-activation failed: {result.ErrorMessage}");
+        }
+
+        string? warning = null;
+        try
+        {
+            _metadataService.RecordActivation(targetFolder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            warning = $"Re-activated, but metadata could not be updated: {ex.Message}";
+        }
+
+        try
+        {
+            await RememberActiveListAsync(targetFolder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            warning = $"Re-activated, but the active mod list could not be remembered: {ex.Message}";
+        }
+
+        return (true, warning);
     }
 
     private async Task SaveNewListAsync(
