@@ -8,3 +8,5 @@ TestResults/
 *.nupkg
 *.snupkg
 .codex
+CLAUDE.md
+.claude
