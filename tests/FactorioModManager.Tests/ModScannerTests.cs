@@ -60,6 +60,38 @@ public sealed class ModScannerTests
         Assert.Contains(folderPath, result.SourceZipPaths);
     }
 
+    [Fact]
+    public void Scan_includes_supported_factorio_data_mods_from_install_folder()
+    {
+        using var modsTemp = new TempDirectory();
+        using var installTemp = new TempDirectory();
+        var dataPath = Path.Combine(installTemp.Path, "data");
+        CreateUnpackedMod(dataPath, "elevated-rails", "elevated-rails", "Elevated Rails", "2.0.0");
+        CreateUnpackedMod(dataPath, "quality", "quality", "Quality", "2.0.0");
+        CreateUnpackedMod(dataPath, "space-age", "space-age", "Space Age", "2.0.0");
+        CreateUnpackedMod(dataPath, "base", "base", "Base", "2.0.0");
+        CreateUnpackedMod(dataPath, "other-data-mod", "other-data-mod", "Other", "1.0.0");
+
+        var results = new ModScanner(new ModInfoReader()).Scan(modsTemp.Path, installTemp.Path);
+
+        Assert.Equal(
+            ["elevated-rails", "quality", "space-age"],
+            results.Select(mod => mod.Name).OrderBy(name => name, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Scan_ignores_missing_factorio_install_data_folder()
+    {
+        using var modsTemp = new TempDirectory();
+        using var installTemp = new TempDirectory();
+        CreateZip(Path.Combine(modsTemp.Path, "root-mod_1.0.0.zip"), "root-mod", "Root Mod", "1.0.0");
+
+        var results = new ModScanner(new ModInfoReader()).Scan(modsTemp.Path, installTemp.Path);
+
+        var result = Assert.Single(results);
+        Assert.Equal("root-mod", result.Name);
+    }
+
     internal static void CreateZip(
         string zipPath,
         string name,

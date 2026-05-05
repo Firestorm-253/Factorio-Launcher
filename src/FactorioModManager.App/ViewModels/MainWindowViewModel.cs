@@ -26,6 +26,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private AppSettings _settings = new();
 
     private string? _modsFolderPath;
+    private string? _factorioInstallFolderPath;
     private string _folderStatus = "Select your Factorio mods folder to begin.";
     private bool _isFolderValid;
     private string _statusMessage = "Ready.";
@@ -72,6 +73,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _activeModListDetector = activeModListDetector;
 
         BrowseFolderCommand = new AsyncRelayCommand(BrowseFolderAsync);
+        BrowseInstallFolderCommand = new AsyncRelayCommand(BrowseInstallFolderAsync);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => IsFolderValid);
         CreateModListCommand = new RelayCommand(StartCreateDraft, () => IsFolderValid && IsNormalMode);
         SaveEditCommand = new AsyncRelayCommand(SaveEditAsync, () => IsEditMode);
@@ -114,6 +116,39 @@ public sealed class MainWindowViewModel : ViewModelBase
             var parts = ModsFolderPath
                 .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries)
                 .TakeLast(3);
+            return string.Join("/", parts);
+        }
+    }
+
+    public string? FactorioInstallFolderPath
+    {
+        get => _factorioInstallFolderPath;
+        private set
+        {
+            if (SetProperty(ref _factorioInstallFolderPath, value))
+            {
+                OnPropertyChanged(nameof(FactorioInstallFolderDisplay));
+                OnPropertyChanged(nameof(FactorioInstallFolderCompact));
+            }
+        }
+    }
+
+    public string FactorioInstallFolderDisplay => string.IsNullOrWhiteSpace(FactorioInstallFolderPath)
+        ? "No Factorio install folder selected"
+        : FactorioInstallFolderPath;
+
+    public string FactorioInstallFolderCompact
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(FactorioInstallFolderPath))
+            {
+                return "install folder";
+            }
+
+            var parts = FactorioInstallFolderPath
+                .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries)
+                .TakeLast(2);
             return string.Join("/", parts);
         }
     }
@@ -335,6 +370,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public int VisibleModListCount => ModLists.Count;
 
     public AsyncRelayCommand BrowseFolderCommand { get; }
+    public AsyncRelayCommand BrowseInstallFolderCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
     public RelayCommand CreateModListCommand { get; }
     public AsyncRelayCommand SaveEditCommand { get; }
@@ -351,6 +387,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         _settings = await _appSettingsService.LoadAsync();
         ModsFolderPath = _settings.LastModsFolderPath;
+        FactorioInstallFolderPath = _settings.FactorioInstallFolderPath;
         ValidateFolder();
 
         if (IsFolderValid)
@@ -377,6 +414,32 @@ public sealed class MainWindowViewModel : ViewModelBase
         await _appSettingsService.SaveAsync(_settings);
         ValidateFolder();
         await RefreshAsync();
+    }
+
+    private async Task BrowseInstallFolderAsync()
+    {
+        var selected = await _dialogService.PickFolderAsync("Select Factorio installation folder");
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            return;
+        }
+
+        if (!Directory.Exists(Path.Combine(selected, "data")))
+        {
+            await _dialogService.ShowErrorAsync(
+                "Invalid Factorio installation folder",
+                "Select the Factorio installation folder that contains the data folder.");
+            return;
+        }
+
+        FactorioInstallFolderPath = selected;
+        _settings.FactorioInstallFolderPath = selected;
+        await _appSettingsService.SaveAsync(_settings);
+
+        if (IsFolderValid)
+        {
+            await RefreshAsync();
+        }
     }
 
     private void ValidateFolder()
@@ -410,7 +473,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             var previousSelection = SelectedModList?.Name;
             _availableMods.Clear();
-            _availableMods.AddRange(_modScanner.Scan(ModsFolderPath));
+            _availableMods.AddRange(_modScanner.Scan(ModsFolderPath, FactorioInstallFolderPath));
             LoadInstalledMods();
 
             var detectedModLists = _modListDetector.Detect(ModsFolderPath).ToList();

@@ -4,6 +4,13 @@ namespace FactorioModManager.App.Factorio;
 
 public sealed class ModScanner
 {
+    private static readonly HashSet<string> SupportedFactorioDataMods = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "elevated-rails",
+        "quality",
+        "space-age"
+    };
+
     private readonly ModInfoReader _reader;
 
     public ModScanner(ModInfoReader reader)
@@ -11,7 +18,7 @@ public sealed class ModScanner
         _reader = reader;
     }
 
-    public IReadOnlyList<ModInfo> Scan(string modsFolderPath)
+    public IReadOnlyList<ModInfo> Scan(string modsFolderPath, string? factorioInstallFolderPath = null)
     {
         if (!Directory.Exists(modsFolderPath))
         {
@@ -24,14 +31,36 @@ public sealed class ModScanner
             .Where(folder => !IsManagerFolder(modsFolderPath, folder))
             .Where(folder => File.Exists(Path.Combine(folder, "info.json")))
             .Select(_reader.ReadDirectory);
+        var factorioDataMods = ScanFactorioDataMods(factorioInstallFolderPath);
 
         return zippedMods
             .Concat(unpackedMods)
+            .Concat(factorioDataMods)
             .GroupBy(mod => mod.Name, StringComparer.OrdinalIgnoreCase)
             .Select(ChoosePreferredDuplicate)
             .OrderBy(mod => mod.DisplayTitle, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(mod => mod.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private IEnumerable<ModInfo> ScanFactorioDataMods(string? factorioInstallFolderPath)
+    {
+        if (string.IsNullOrWhiteSpace(factorioInstallFolderPath))
+        {
+            return [];
+        }
+
+        var dataFolderPath = Path.Combine(factorioInstallFolderPath, "data");
+        if (!Directory.Exists(dataFolderPath))
+        {
+            return [];
+        }
+
+        return Directory
+            .EnumerateDirectories(dataFolderPath, "*", SearchOption.TopDirectoryOnly)
+            .Where(folder => SupportedFactorioDataMods.Contains(Path.GetFileName(folder)))
+            .Where(folder => File.Exists(Path.Combine(folder, "info.json")))
+            .Select(_reader.ReadDirectory);
     }
 
     private static bool IsManagerFolder(string modsFolderPath, string folderPath)

@@ -5,10 +5,13 @@ namespace FactorioModManager.Tests;
 internal sealed class TestDialogService : IDialogService
 {
     public List<string> Errors { get; } = [];
+    public Queue<string?> PickedFolders { get; } = [];
+    public List<string> PickFolderTitles { get; } = [];
 
     public Task<string?> PickFolderAsync(string title)
     {
-        return Task.FromResult<string?>(null);
+        PickFolderTitles.Add(title);
+        return Task.FromResult(PickedFolders.Count == 0 ? null : PickedFolders.Dequeue());
     }
 
     public Task<string?> PromptAsync(string title, string message, string? initialValue = null)

@@ -222,7 +222,7 @@
 
   <Grid RowDefinitions="48,*">
     <Border Grid.Row="0" Background="#15110D" BorderBrush="#221D18" BorderThickness="0,0,0,1" Padding="14,8">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
         <Border Width="24" Height="24" CornerRadius="4" Background="#D97A2C" BorderBrush="#B86620" BorderThickness="1">
           <TextBlock Text="F" Foreground="#1A0E05" FontWeight="Bold" FontFamily="Consolas, Cascadia Mono, monospace" HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
@@ -240,8 +240,19 @@
         <Button Grid.Column="4" Classes="path" Command="{Binding BrowseFolderCommand}" VerticalAlignment="Center">
           <TextBlock Text="{Binding FolderPathCompact}" Classes="mono" TextTrimming="CharacterEllipsis" MaxWidth="360" />
         </Button>
+        <TextBlock Grid.Column="5" Text="/" Classes="dim" VerticalAlignment="Center" />
+        <Button Grid.Column="6"
+                Classes="path"
+                Command="{Binding BrowseInstallFolderCommand}"
+                VerticalAlignment="Center"
+                ToolTip.Tip="{Binding FactorioInstallFolderDisplay}">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <TextBlock Text="data:" Classes="dim" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding FactorioInstallFolderCompact}" Classes="mono" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+          </StackPanel>
+        </Button>
 
-        <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+        <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
           <Button Classes="tabActive" Command="{Binding ShowListsCommand}" IsVisible="{Binding IsListsTabActive}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Text="Lists" Foreground="#F0A455" FontWeight="Medium" />
@@ -276,7 +287,7 @@
           </Button>
         </StackPanel>
 
-        <Border Grid.Column="7" Background="#15201A" BorderBrush="#2A4A30" BorderThickness="1" CornerRadius="5" Padding="9,4" IsVisible="{Binding HasActiveList}">
+        <Border Grid.Column="9" Background="#15201A" BorderBrush="#2A4A30" BorderThickness="1" CornerRadius="5" Padding="9,4" IsVisible="{Binding HasActiveList}">
           <StackPanel Orientation="Horizontal" Spacing="7">
             <Ellipse Width="7" Height="7" Fill="#5FA84A" VerticalAlignment="Center" />
             <TextBlock Text="{Binding ActiveListName}" Foreground="#5FA84A" FontWeight="SemiBold" FontSize="12" />

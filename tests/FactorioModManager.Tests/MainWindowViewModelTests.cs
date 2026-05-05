@@ -210,6 +210,56 @@ public sealed class MainWindowViewModelTests
         Assert.Null(settings.ActiveModListFolderPath);
     }
 
+    [Fact]
+    public async Task InitializeAsync_loads_factorio_data_mods_from_saved_install_folder()
+    {
+        using var modsTemp = new TempDirectory();
+        using var installTemp = new TempDirectory();
+        File.WriteAllText(Path.Combine(modsTemp.Path, FactorioFileNames.ModListJson), """{"mods":[]}""");
+        File.WriteAllBytes(Path.Combine(modsTemp.Path, FactorioFileNames.ModSettingsDat), [1, 2, 3]);
+        ModScannerTests.CreateZip(Path.Combine(modsTemp.Path, "root-mod_1.0.0.zip"), "root-mod", "Root Mod", "1.0.0");
+        ModScannerTests.CreateUnpackedMod(Path.Combine(installTemp.Path, "data"), "quality", "quality", "Quality", "2.0.0");
+
+        var settingsPath = Path.Combine(modsTemp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings
+        {
+            LastModsFolderPath = modsTemp.Path,
+            FactorioInstallFolderPath = installTemp.Path
+        });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(2, viewModel.AvailableModCount);
+        Assert.Contains(viewModel.InstalledMods, mod => mod.Name == "quality");
+    }
+
+    [Fact]
+    public async Task BrowseInstallFolderCommand_saves_install_folder_and_refreshes_available_mods()
+    {
+        using var modsTemp = new TempDirectory();
+        using var installTemp = new TempDirectory();
+        File.WriteAllText(Path.Combine(modsTemp.Path, FactorioFileNames.ModListJson), """{"mods":[]}""");
+        File.WriteAllBytes(Path.Combine(modsTemp.Path, FactorioFileNames.ModSettingsDat), [1, 2, 3]);
+        ModScannerTests.CreateUnpackedMod(Path.Combine(installTemp.Path, "data"), "space-age", "space-age", "Space Age", "2.0.0");
+
+        var settingsPath = Path.Combine(modsTemp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings { LastModsFolderPath = modsTemp.Path });
+        var dialogs = new TestDialogService();
+        dialogs.PickedFolders.Enqueue(installTemp.Path);
+        var viewModel = CreateViewModel(dialogs, appSettingsService);
+
+        await viewModel.InitializeAsync();
+        await viewModel.BrowseInstallFolderCommand.ExecuteAsync();
+
+        var settings = await appSettingsService.LoadAsync();
+        Assert.Equal(installTemp.Path, settings.FactorioInstallFolderPath);
+        Assert.Equal(installTemp.Path, viewModel.FactorioInstallFolderPath);
+        Assert.Contains(viewModel.InstalledMods, mod => mod.Name == "space-age");
+    }
+
     private static MainWindowViewModel CreateViewModel(TestDialogService dialogService, AppSettingsService appSettingsService)
     {
         var modInfoReader = new ModInfoReader();
