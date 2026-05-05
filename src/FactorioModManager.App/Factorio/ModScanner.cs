@@ -18,13 +18,27 @@ public sealed class ModScanner
             return [];
         }
 
-        return Directory.EnumerateFiles(modsFolderPath, "*.zip", SearchOption.TopDirectoryOnly)
-            .Select(_reader.Read)
+        var zippedMods = Directory.EnumerateFiles(modsFolderPath, "*.zip", SearchOption.TopDirectoryOnly)
+            .Select(_reader.Read);
+        var unpackedMods = Directory.EnumerateDirectories(modsFolderPath, "*", SearchOption.TopDirectoryOnly)
+            .Where(folder => !IsManagerFolder(modsFolderPath, folder))
+            .Where(folder => File.Exists(Path.Combine(folder, "info.json")))
+            .Select(_reader.ReadDirectory);
+
+        return zippedMods
+            .Concat(unpackedMods)
             .GroupBy(mod => mod.Name, StringComparer.OrdinalIgnoreCase)
             .Select(ChoosePreferredDuplicate)
             .OrderBy(mod => mod.DisplayTitle, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(mod => mod.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static bool IsManagerFolder(string modsFolderPath, string folderPath)
+    {
+        var managerRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(ManagerWorkspacePaths.GetRoot(modsFolderPath)));
+        var candidate = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folderPath));
+        return string.Equals(managerRoot, candidate, StringComparison.OrdinalIgnoreCase);
     }
 
     private static ModInfo ChoosePreferredDuplicate(IGrouping<string, ModInfo> duplicateGroup)
@@ -84,6 +98,6 @@ public sealed class ModScanner
         var warningCount = mods.Count(mod => mod.HasMetadataWarning);
         return warningCount == 0
             ? null
-            : $"{warningCount} zip file(s) had metadata warnings.";
+            : $"{warningCount} mod source(s) had metadata warnings.";
     }
 }

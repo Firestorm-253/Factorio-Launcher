@@ -40,6 +40,42 @@ public sealed class ModInfoReaderTests
         Assert.True(result.HasMetadataWarning);
     }
 
+    [Fact]
+    public void ReadDirectory_extracts_metadata_from_unpacked_mod_folder()
+    {
+        using var temp = new TempDirectory();
+        var folderPath = Path.Combine(temp.Path, "FasterStart_Firestorm_2.0.2");
+        Directory.CreateDirectory(folderPath);
+        File.WriteAllText(Path.Combine(folderPath, "info.json"), """
+        {
+          "name": "FasterStart_Firestorm",
+          "title": "Faster Start Firestorm",
+          "version": "2.0.2"
+        }
+        """);
+
+        var result = new ModInfoReader().ReadDirectory(folderPath);
+
+        Assert.Equal("FasterStart_Firestorm", result.Name);
+        Assert.Equal("Faster Start Firestorm", result.Title);
+        Assert.Equal("2.0.2", result.Version);
+        Assert.False(result.HasMetadataWarning);
+    }
+
+    [Fact]
+    public void ReadDirectory_falls_back_from_folder_name_when_info_json_is_missing()
+    {
+        using var temp = new TempDirectory();
+        var folderPath = Path.Combine(temp.Path, "folder-mod_3.1.4");
+        Directory.CreateDirectory(folderPath);
+
+        var result = new ModInfoReader().ReadDirectory(folderPath);
+
+        Assert.Equal("folder-mod", result.Name);
+        Assert.Equal("3.1.4", result.Version);
+        Assert.True(result.HasMetadataWarning);
+    }
+
     private static void CreateZip(string zipPath, string entryName, string contents)
     {
         using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);

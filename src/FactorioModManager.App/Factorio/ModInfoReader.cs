@@ -28,36 +28,31 @@ public sealed class ModInfoReader
 
             using var stream = infoEntry.Open();
             using var document = JsonDocument.Parse(stream);
-            var root = document.RootElement;
-            var name = ReadString(root, "name");
-            var title = ReadString(root, "title");
-            var version = ReadString(root, "version");
-            var author = ReadString(root, "author");
-            var description = ReadString(root, "description");
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                var fallback = CreateFallback(zipPath, "info.json did not contain a mod name.");
-                return fallback.WithMetadata(title, version, author, description);
-            }
-
-            return new ModInfo
-            {
-                Name = name,
-                Title = string.IsNullOrWhiteSpace(title) ? name : title,
-                Version = version,
-                Author = author,
-                Description = description,
-                SourceZipPath = zipPath,
-                SourceZipPaths = [zipPath],
-                AvailableVersions = string.IsNullOrWhiteSpace(version) ? [] : [version],
-                SizeBytes = GetFileSize(zipPath),
-                TotalSizeBytes = GetFileSize(zipPath)
-            };
+            return CreateFromInfoJson(zipPath, document.RootElement, () => CreateFallback(zipPath, "info.json did not contain a mod name."));
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException or UnauthorizedAccessException)
         {
             return CreateFallback(zipPath, $"Could not read mod metadata: {ex.Message}");
+        }
+    }
+
+    public ModInfo ReadDirectory(string modFolderPath)
+    {
+        try
+        {
+            var infoPath = Path.Combine(modFolderPath, "info.json");
+            if (!File.Exists(infoPath))
+            {
+                return CreateFallback(modFolderPath, "No info.json was found in the folder.");
+            }
+
+            using var stream = File.OpenRead(infoPath);
+            using var document = JsonDocument.Parse(stream);
+            return CreateFromInfoJson(modFolderPath, document.RootElement, () => CreateFallback(modFolderPath, "info.json did not contain a mod name."));
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return CreateFallback(modFolderPath, $"Could not read mod metadata: {ex.Message}");
         }
     }
 
@@ -68,33 +63,76 @@ public sealed class ModInfoReader
             : null;
     }
 
-    private static ModInfo CreateFallback(string zipPath, string warning)
+    private static ModInfo CreateFromInfoJson(string sourcePath, JsonElement root, Func<ModInfo> createFallback)
     {
-        var stem = Path.GetFileNameWithoutExtension(zipPath);
+        var name = ReadString(root, "name");
+        var title = ReadString(root, "title");
+        var version = ReadString(root, "version");
+        var author = ReadString(root, "author");
+        var description = ReadString(root, "description");
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return createFallback().WithMetadata(title, version, author, description);
+        }
+
+        var size = GetSourceSize(sourcePath);
+        return new ModInfo
+        {
+            Name = name,
+            Title = string.IsNullOrWhiteSpace(title) ? name : title,
+            Version = version,
+            Author = author,
+            Description = description,
+            SourceZipPath = sourcePath,
+            SourceZipPaths = [sourcePath],
+            AvailableVersions = string.IsNullOrWhiteSpace(version) ? [] : [version],
+            SizeBytes = size,
+            TotalSizeBytes = size
+        };
+    }
+
+    private static ModInfo CreateFallback(string sourcePath, string warning)
+    {
+        var stem = Directory.Exists(sourcePath)
+            ? Path.GetFileName(sourcePath)
+            : Path.GetFileNameWithoutExtension(sourcePath);
         var match = FileNamePattern.Match(stem);
         var name = match.Success ? match.Groups["name"].Value : stem;
         var version = match.Success ? match.Groups["version"].Value : null;
+        var size = GetSourceSize(sourcePath);
 
         return new ModInfo
         {
             Name = name,
             Title = name,
             Version = version,
-            SourceZipPath = zipPath,
-            SourceZipPaths = [zipPath],
+            SourceZipPath = sourcePath,
+            SourceZipPaths = [sourcePath],
             AvailableVersions = string.IsNullOrWhiteSpace(version) ? [] : [version],
-            SizeBytes = GetFileSize(zipPath),
-            TotalSizeBytes = GetFileSize(zipPath),
+            SizeBytes = size,
+            TotalSizeBytes = size,
             HasMetadataWarning = true,
             WarningMessage = warning
         };
     }
 
-    private static long GetFileSize(string zipPath)
+    private static long GetSourceSize(string sourcePath)
     {
         try
         {
-            return File.Exists(zipPath) ? new FileInfo(zipPath).Length : 0;
+            if (File.Exists(sourcePath))
+            {
+                return new FileInfo(sourcePath).Length;
+            }
+
+            if (Directory.Exists(sourcePath))
+            {
+                return Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories)
+                    .Sum(path => new FileInfo(path).Length);
+            }
+
+            return 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
