@@ -105,6 +105,40 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task DuplicateSelectedCommand_creates_new_list_without_overwriting_source()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Path, FactorioFileNames.ModListJson), """{"mods":[]}""");
+        File.WriteAllBytes(Path.Combine(temp.Path, FactorioFileNames.ModSettingsDat), [0]);
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "space-exploration_0.6.128.zip"), "space-exploration", "Space Exploration", "0.6.128");
+        var sourceFolder = CreateManagedList(temp.Path, "Original", "Original description", "space-exploration");
+        File.WriteAllBytes(Path.Combine(sourceFolder, FactorioFileNames.ModSettingsDat), [5, 6, 7]);
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings { LastModsFolderPath = temp.Path });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+        viewModel.SelectedModList = viewModel.ModLists.Single(list => list.Name == "Original");
+        viewModel.DuplicateSelectedCommand.Execute(null);
+
+        Assert.True(viewModel.IsEditMode);
+        Assert.Equal("Original Copy", viewModel.DraftName);
+        Assert.Equal("Original description", viewModel.DraftDescription);
+
+        await viewModel.SaveEditCommand.ExecuteAsync();
+
+        var copyFolder = ManagerWorkspacePaths.GetManagedListFolder(temp.Path, "Original Copy");
+        Assert.True(Directory.Exists(sourceFolder));
+        Assert.True(Directory.Exists(copyFolder));
+        Assert.Equal([5, 6, 7], File.ReadAllBytes(Path.Combine(copyFolder, FactorioFileNames.ModSettingsDat)));
+        var copiedMods = new ModListReader().ReadSelectedMods(copyFolder);
+        Assert.Equal(["space-exploration"], copiedMods);
+        Assert.Equal("Original Copy", viewModel.SelectedModList?.Name);
+    }
+
+    [Fact]
     public async Task InitializeAsync_marks_only_the_remembered_matching_list_active()
     {
         using var temp = new TempDirectory();

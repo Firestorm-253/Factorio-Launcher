@@ -386,6 +386,7 @@
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7" VerticalAlignment="Top">
                 <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding IsNormalMode}">
                   <Button Content="Edit" Command="{Binding EditSelectedCommand}" />
+                  <Button Content="Duplicate" Command="{Binding DuplicateSelectedCommand}" />
                   <Button Classes="danger" Content="Delete" Command="{Binding DeleteSelectedCommand}" />
                   <Button Classes="primary" Content="Activate" Command="{Binding ActivateSelectedCommand}" IsEnabled="{Binding CanActivateSelected}" />
                 </StackPanel>

@@ -5,14 +5,18 @@ public sealed class ModSettingsManager
     public void CopyRootSettingsToModList(string modsFolderPath, string modListFolderPath)
     {
         var source = Path.Combine(modsFolderPath, FactorioFileNames.ModSettingsDat);
-        var destination = Path.Combine(modListFolderPath, FactorioFileNames.ModSettingsDat);
+        CopySettingsToModList(source, modListFolderPath, "Root mod-settings.dat is missing.");
+    }
 
-        if (!File.Exists(source))
+    public void CopySettingsToModList(string sourceSettingsPath, string modListFolderPath, string missingSourceMessage = "mod-settings.dat is missing.")
+    {
+        if (!File.Exists(sourceSettingsPath))
         {
-            throw new FileNotFoundException("Root mod-settings.dat is missing.", source);
+            throw new FileNotFoundException(missingSourceMessage, sourceSettingsPath);
         }
 
+        var destination = Path.Combine(modListFolderPath, FactorioFileNames.ModSettingsDat);
         Directory.CreateDirectory(modListFolderPath);
-        File.Copy(source, destination, overwrite: true);
+        File.Copy(sourceSettingsPath, destination, overwrite: true);
     }
 }

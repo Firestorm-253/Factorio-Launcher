@@ -35,6 +35,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private ModListItemViewModel? _selectedModList;
     private bool _isEditMode;
     private bool _isCreating;
+    private string? _duplicateSourceFolderPath;
     private string? _searchText;
     private string? _listSearchText;
     private string _activeTab = "Lists";
@@ -82,6 +83,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SaveEditCommand = new AsyncRelayCommand(SaveEditAsync, () => IsEditMode);
         CancelEditCommand = new RelayCommand(CancelEdit, () => IsEditMode);
         EditSelectedCommand = new RelayCommand(EditSelected, () => SelectedModList is not null && IsNormalMode);
+        DuplicateSelectedCommand = new RelayCommand(DuplicateSelected, () => SelectedModList is not null && IsNormalMode);
         ActivateSelectedCommand = new AsyncRelayCommand(ActivateSelectedAsync, () => CanActivateSelected);
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync, () => SelectedModList is not null && IsNormalMode);
         ShowListsCommand = new RelayCommand(() => ActiveTab = "Lists");
@@ -381,6 +383,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand SaveEditCommand { get; }
     public RelayCommand CancelEditCommand { get; }
     public RelayCommand EditSelectedCommand { get; }
+    public RelayCommand DuplicateSelectedCommand { get; }
     public AsyncRelayCommand ActivateSelectedCommand { get; }
     public AsyncRelayCommand DeleteSelectedCommand { get; }
     public RelayCommand ShowListsCommand { get; }
@@ -552,6 +555,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         _isCreating = true;
+        _duplicateSourceFolderPath = null;
         SelectedModList = null;
         DraftName = GenerateUniqueDraftName();
         DraftDescription = string.Empty;
@@ -568,15 +572,36 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private void DuplicateSelected()
+    {
+        if (SelectedModList is not null)
+        {
+            StartDuplicate(SelectedModList);
+        }
+    }
+
     private void StartEdit(ModListItemViewModel item)
     {
         SelectedModList = item;
         _isCreating = false;
+        _duplicateSourceFolderPath = null;
         DraftName = item.Name;
         DraftDescription = item.ModList.Description;
         BeginEdit(item.ModList.SelectedMods, item.ModList.SelectedVersions);
         ActiveTab = "Lists";
         StatusMessage = $"Editing {item.Name}.";
+    }
+
+    private void StartDuplicate(ModListItemViewModel item)
+    {
+        SelectedModList = item;
+        _isCreating = true;
+        _duplicateSourceFolderPath = item.FolderPath;
+        DraftName = GenerateUniqueDuplicateName(item.Name);
+        DraftDescription = item.ModList.Description;
+        BeginEdit(item.ModList.SelectedMods, item.ModList.SelectedVersions);
+        ActiveTab = "Lists";
+        StatusMessage = $"Duplicating {item.Name}.";
     }
 
     private void BeginEdit(IEnumerable<string> selectedModNames, IReadOnlyDictionary<string, string> selectedVersions)
@@ -669,12 +694,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         IReadOnlyList<string> availableNames,
         IReadOnlyDictionary<string, string> selectedVersions)
     {
-        var rootSettingsPath = Path.Combine(ModsFolderPath!, FactorioFileNames.ModSettingsDat);
-        if (!File.Exists(rootSettingsPath))
+        var settingsSourcePath = GetNewListSettingsSourcePath();
+        if (!File.Exists(settingsSourcePath))
         {
             await _dialogService.ShowErrorAsync(
                 "Missing mod-settings.dat",
-                "The root mods folder has no mod-settings.dat. Create or launch Factorio once so the file exists, then create the mod list.");
+                _duplicateSourceFolderPath is null
+                    ? "The root mods folder has no mod-settings.dat. Create or launch Factorio once so the file exists, then create the mod list."
+                    : "The source mod list has no mod-settings.dat, so it cannot be duplicated.");
             return;
         }
 
@@ -690,7 +717,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         try
         {
             createdFolder = _modListFileManager.CreateManagedListFolder(ModsFolderPath!, createdName);
-            _modSettingsManager.CopyRootSettingsToModList(ModsFolderPath!, createdFolder);
+            _modSettingsManager.CopySettingsToModList(settingsSourcePath, createdFolder);
             _modListWriter.Write(createdFolder, selectedNames, availableNames);
             _metadataService.Save(createdFolder, DraftDescription, selectedVersions, null, null);
         }
@@ -743,6 +770,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void FinishEditing()
     {
         _isCreating = false;
+        _duplicateSourceFolderPath = null;
         IsEditMode = false;
         foreach (var mod in _allEditableMods)
         {
@@ -1078,10 +1106,36 @@ public sealed class MainWindowViewModel : ViewModelBase
         return $"{baseName} {suffix}";
     }
 
+    private string GenerateUniqueDuplicateName(string sourceName)
+    {
+        var baseName = $"{sourceName} Copy";
+        var existing = _allModListItems.Select(list => list.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!existing.Contains(baseName))
+        {
+            return baseName;
+        }
+
+        var suffix = 2;
+        while (existing.Contains($"{baseName} {suffix}"))
+        {
+            suffix++;
+        }
+
+        return $"{baseName} {suffix}";
+    }
+
+    private string GetNewListSettingsSourcePath()
+    {
+        return _duplicateSourceFolderPath is null
+            ? Path.Combine(ModsFolderPath!, FactorioFileNames.ModSettingsDat)
+            : Path.Combine(_duplicateSourceFolderPath, FactorioFileNames.ModSettingsDat);
+    }
+
     private void RaiseSelectionCommandStates()
     {
         OnPropertyChanged(nameof(CanActivateSelected));
         EditSelectedCommand.RaiseCanExecuteChanged();
+        DuplicateSelectedCommand.RaiseCanExecuteChanged();
         ActivateSelectedCommand.RaiseCanExecuteChanged();
         DeleteSelectedCommand.RaiseCanExecuteChanged();
     }
