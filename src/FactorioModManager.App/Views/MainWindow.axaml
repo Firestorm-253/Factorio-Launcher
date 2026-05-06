@@ -428,12 +428,11 @@
                 <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding IsNormalMode}">
                   <Button Content="Edit" Command="{Binding EditSelectedCommand}" />
                   <Button Content="Duplicate" Command="{Binding DuplicateSelectedCommand}" />
-                  <Button Content="Import" Command="{Binding ApplyCurrentToSelectedCommand}" ToolTip.Tip="Overwrite list with current game mods" />
                   <Button Classes="danger" Content="Delete" Command="{Binding DeleteSelectedCommand}" />
                   <Button Classes="primary" Content="Activate" Command="{Binding ActivateSelectedCommand}" IsEnabled="{Binding CanActivateSelected}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding IsEditMode}">
-                  <Button Content="Import" Command="{Binding ApplyCurrentToSelectedCommand}" ToolTip.Tip="Overwrite list with current game mods" />
+                  <Button Content="Import" Command="{Binding ImportCurrentToDraftCommand}" ToolTip.Tip="Overwrite list with current game mods" />
                   <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
                   <Button Classes="primary" Content="Save" Command="{Binding SaveEditCommand}" />
                 </StackPanel>

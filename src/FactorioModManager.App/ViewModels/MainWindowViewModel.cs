@@ -15,6 +15,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IFactorioGameLauncher _factorioGameLauncher;
     private readonly ModScanner _modScanner;
     private readonly ModListDetector _modListDetector;
+    private readonly ModListReader _modListReader = new();
     private readonly ModListWriter _modListWriter;
     private readonly ModListMetadataService _metadataService;
     private readonly ModSettingsManager _modSettingsManager;
@@ -37,6 +38,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _isEditMode;
     private bool _isCreating;
     private string? _duplicateSourceFolderPath;
+    private bool _importRootSettingsOnSave;
     private string? _searchText;
     private string? _listSearchText;
     private string _activeTab = "Lists";
@@ -88,7 +90,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         CancelEditCommand = new RelayCommand(CancelEdit, () => IsEditMode);
         EditSelectedCommand = new RelayCommand(EditSelected, () => SelectedModList is not null && IsNormalMode);
         DuplicateSelectedCommand = new RelayCommand(DuplicateSelected, () => SelectedModList is not null && IsNormalMode);
-        ApplyCurrentToSelectedCommand = new AsyncRelayCommand(ApplyCurrentToSelectedAsync, () => SelectedModList is not null);
+        ImportCurrentToDraftCommand = new AsyncRelayCommand(ImportCurrentToDraftAsync, () => IsEditMode);
         ActivateSelectedCommand = new AsyncRelayCommand(ActivateSelectedAsync, () => CanActivateSelected);
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync, () => SelectedModList is not null && IsNormalMode);
         ShowListsCommand = new RelayCommand(() => ActiveTab = "Lists");
@@ -258,6 +260,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(CanActivateSelected));
                 SaveEditCommand.RaiseCanExecuteChanged();
                 CancelEditCommand.RaiseCanExecuteChanged();
+                ImportCurrentToDraftCommand.RaiseCanExecuteChanged();
                 CreateModListCommand.RaiseCanExecuteChanged();
                 RaiseSelectionCommandStates();
             }
@@ -399,7 +402,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public RelayCommand CancelEditCommand { get; }
     public RelayCommand EditSelectedCommand { get; }
     public RelayCommand DuplicateSelectedCommand { get; }
-    public AsyncRelayCommand ApplyCurrentToSelectedCommand { get; }
+    public AsyncRelayCommand ImportCurrentToDraftCommand { get; }
     public AsyncRelayCommand ActivateSelectedCommand { get; }
     public AsyncRelayCommand DeleteSelectedCommand { get; }
     public RelayCommand ShowListsCommand { get; }
@@ -593,6 +596,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         _isCreating = true;
         _duplicateSourceFolderPath = null;
+        _importRootSettingsOnSave = false;
         SelectedModList = null;
         DraftName = GenerateUniqueDraftName();
         DraftDescription = string.Empty;
@@ -622,6 +626,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedModList = item;
         _isCreating = false;
         _duplicateSourceFolderPath = null;
+        _importRootSettingsOnSave = false;
         DraftName = item.Name;
         DraftDescription = item.ModList.Description;
         BeginEdit(item.ModList.SelectedMods, item.ModList.SelectedVersions);
@@ -634,6 +639,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedModList = item;
         _isCreating = true;
         _duplicateSourceFolderPath = item.FolderPath;
+        _importRootSettingsOnSave = false;
         DraftName = GenerateUniqueDuplicateName(item.Name);
         DraftDescription = item.ModList.Description;
         BeginEdit(item.ModList.SelectedMods, item.ModList.SelectedVersions);
@@ -709,6 +715,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
 
             _modListWriter.Write(targetFolder, selectedNames, availableNames);
+            if (_importRootSettingsOnSave)
+            {
+                _modSettingsManager.CopyRootSettingsToModList(ModsFolderPath!, targetFolder);
+            }
+
             _metadataService.Save(
                 targetFolder,
                 DraftDescription,
@@ -853,6 +864,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         _isCreating = false;
         _duplicateSourceFolderPath = null;
+        _importRootSettingsOnSave = false;
         IsEditMode = false;
         foreach (var mod in _allEditableMods)
         {
@@ -880,14 +892,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedModList is not null)
         {
             await DeleteAsync(SelectedModList);
-        }
-    }
-
-    private async Task ApplyCurrentToSelectedAsync()
-    {
-        if (SelectedModList is not null)
-        {
-            await ApplyCurrentToAsync(SelectedModList);
         }
     }
 
@@ -983,16 +987,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private async Task ApplyCurrentToAsync(ModListItemViewModel item)
+    private async Task ImportCurrentToDraftAsync()
     {
-        if (!EnsureWorkspace())
+        if (!EnsureWorkspace() || !IsEditMode)
         {
             return;
         }
 
         var confirmed = await _dialogService.ConfirmAsync(
-            "Import current files",
-            $"Overwrite {item.Name} with the current root mod-list.json and mod-settings.dat?",
+            "Import current game mods",
+            "Replace the draft selection with the current root mod-list.json? Save to write these imported mods to the list.",
             "Import");
         if (!confirmed)
         {
@@ -1001,16 +1005,26 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         try
         {
-            _modListFileManager.ApplyRootFilesToManagedList(ModsFolderPath!, item.FolderPath);
-            StatusMessage = $"Imported current root files to {item.Name}.";
-            if (IsEditMode)
+            var selectedMods = _modListReader
+                .ReadSelectedMods(ModsFolderPath!)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var mod in _allEditableMods)
             {
-                FinishEditing();
+                mod.IsSelected = selectedMods.Contains(mod.Name);
             }
 
-            await RefreshAsync();
-            SelectedModList = _allModListItems.FirstOrDefault(list =>
-                string.Equals(list.Name, item.Name, StringComparison.OrdinalIgnoreCase));
+            if (_isCreating)
+            {
+                _duplicateSourceFolderPath = null;
+            }
+
+            _importRootSettingsOnSave = true;
+
+            SearchText = string.Empty;
+            ApplyEditorFilter();
+            UpdateDraftSummary();
+            StatusMessage = $"Imported {DraftSelectedCount} current game mods into the draft.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -1452,7 +1466,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanActivateSelected));
         EditSelectedCommand.RaiseCanExecuteChanged();
         DuplicateSelectedCommand.RaiseCanExecuteChanged();
-        ApplyCurrentToSelectedCommand.RaiseCanExecuteChanged();
+        ImportCurrentToDraftCommand.RaiseCanExecuteChanged();
         ActivateSelectedCommand.RaiseCanExecuteChanged();
         DeleteSelectedCommand.RaiseCanExecuteChanged();
     }
