@@ -984,9 +984,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         var confirmed = await _dialogService.ConfirmAsync(
-            "Apply current files",
+            "Import current files",
             $"Overwrite {item.Name} with the current root mod-list.json and mod-settings.dat?",
-            "Apply");
+            "Import");
         if (!confirmed)
         {
             return;
@@ -995,7 +995,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         try
         {
             _modListFileManager.ApplyRootFilesToManagedList(ModsFolderPath!, item.FolderPath);
-            StatusMessage = $"Applied current root files to {item.Name}.";
+            StatusMessage = $"Imported current root files to {item.Name}.";
             await RefreshAsync();
             SelectedModList = _allModListItems.FirstOrDefault(list =>
                 string.Equals(list.Name, item.Name, StringComparison.OrdinalIgnoreCase));
@@ -1003,7 +1003,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             ErrorMessage = ex.Message;
-            await _dialogService.ShowErrorAsync("Apply failed", ex.Message);
+            await _dialogService.ShowErrorAsync("Import failed", ex.Message);
         }
     }
 

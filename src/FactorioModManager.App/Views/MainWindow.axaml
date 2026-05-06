@@ -428,7 +428,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding IsNormalMode}">
                   <Button Content="Edit" Command="{Binding EditSelectedCommand}" />
                   <Button Content="Duplicate" Command="{Binding DuplicateSelectedCommand}" />
-                  <Button Content="Apply" Command="{Binding ApplyCurrentToSelectedCommand}" ToolTip.Tip="Overwrite selected list with current root files" />
+                  <Button Content="Import" Command="{Binding ApplyCurrentToSelectedCommand}" ToolTip.Tip="Overwrite list with current game mods" />
                   <Button Classes="danger" Content="Delete" Command="{Binding DeleteSelectedCommand}" />
                   <Button Classes="primary" Content="Activate" Command="{Binding ActivateSelectedCommand}" IsEnabled="{Binding CanActivateSelected}" />
                 </StackPanel>
