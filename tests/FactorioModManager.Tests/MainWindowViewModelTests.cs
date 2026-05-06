@@ -105,6 +105,55 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task Edit_version_selection_marks_older_versions_and_hides_single_version_dropdowns()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(Path.Combine(temp.Path, FactorioFileNames.ModListJson), """{"mods":[]}""");
+        File.WriteAllBytes(Path.Combine(temp.Path, FactorioFileNames.ModSettingsDat), [1, 2, 3]);
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "multi-mod_1.0.0.zip"), "multi-mod", "Multi Mod", "1.0.0");
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "multi-mod_1.2.0.zip"), "multi-mod", "Multi Mod", "1.2.0");
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "single-mod_1.0.0.zip"), "single-mod", "Single Mod", "1.0.0");
+        CreateManagedList(temp.Path, "Selection", "Selected mods", "multi-mod", "single-mod");
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings { LastModsFolderPath = temp.Path });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+        viewModel.EditSelectedCommand.Execute(null);
+
+        var multiVersionMod = viewModel.EditableMods.Single(mod => mod.Name == "multi-mod");
+        var singleVersionMod = viewModel.EditableMods.Single(mod => mod.Name == "single-mod");
+
+        Assert.True(multiVersionMod.HasMultipleVersions);
+        Assert.False(multiVersionMod.HasSingleVersion);
+        Assert.Equal("1.2.0", multiVersionMod.NewestVersion);
+        Assert.Equal("1.0.0", multiVersionMod.SelectedVersion);
+        Assert.True(multiVersionMod.IsUsingOlderVersion);
+        Assert.Contains("1.2.0", multiVersionMod.OlderVersionToolTip);
+
+        multiVersionMod.SelectedVersion = "1.2.0";
+
+        Assert.False(multiVersionMod.IsUsingOlderVersion);
+
+        multiVersionMod.SelectedVersion = "1.0.0";
+
+        Assert.True(multiVersionMod.IsUsingOlderVersion);
+        Assert.False(singleVersionMod.HasMultipleVersions);
+        Assert.True(singleVersionMod.HasSingleVersion);
+        Assert.False(singleVersionMod.IsUsingOlderVersion);
+
+        viewModel.CancelEditCommand.Execute(null);
+        viewModel.CreateModListCommand.Execute(null);
+
+        var newDraftMod = viewModel.EditableMods.Single(mod => mod.Name == "multi-mod");
+
+        Assert.Equal("1.2.0", newDraftMod.SelectedVersion);
+        Assert.False(newDraftMod.IsUsingOlderVersion);
+    }
+
+    [Fact]
     public async Task Manual_mod_list_order_is_saved_and_restored_after_reopen()
     {
         using var temp = new TempDirectory();

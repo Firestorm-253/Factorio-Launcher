@@ -523,10 +523,33 @@
                         <TextBlock Grid.Row="1" Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis" />
                       </Grid>
                       <TextBlock Grid.Column="2" Text="{Binding Size}" Classes="mono" VerticalAlignment="Center" />
-                      <ComboBox Grid.Column="3"
-                                ItemsSource="{Binding AvailableVersions}"
-                                SelectedItem="{Binding SelectedVersion}"
-                                IsEnabled="{Binding IsSelected}" />
+                      <StackPanel Grid.Column="3" Spacing="3" VerticalAlignment="Center">
+                        <ComboBox ItemsSource="{Binding AvailableVersions}"
+                                  SelectedItem="{Binding SelectedVersion}"
+                                  IsEnabled="{Binding IsSelected}"
+                                  IsVisible="{Binding HasMultipleVersions}" />
+                        <Border Background="#221D18"
+                                BorderBrush="#3A342C"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="7,0"
+                                Height="24"
+                                MinWidth="66"
+                                HorizontalAlignment="Left"
+                                IsVisible="{Binding HasSingleVersion}">
+                          <TextBlock Text="{Binding SelectedVersion}" Classes="mono" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Background="#2A1C10"
+                                BorderBrush="#D97A2C"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="5,1"
+                                HorizontalAlignment="Left"
+                                IsVisible="{Binding IsUsingOlderVersion}"
+                                ToolTip.Tip="{Binding OlderVersionToolTip}">
+                          <TextBlock Text="OLDER" Foreground="#F0A455" FontSize="9" FontWeight="SemiBold" />
+                        </Border>
+                      </StackPanel>
                     </Grid>
                   </Border>
                 </DataTemplate>

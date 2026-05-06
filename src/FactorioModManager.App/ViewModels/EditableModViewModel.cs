@@ -32,11 +32,16 @@ public sealed class EditableModViewModel : ViewModelBase
     public string? Description { get; }
     public string Size { get; }
     public IReadOnlyList<string> AvailableVersions { get; }
+    public string NewestVersion => AvailableVersions.FirstOrDefault() ?? "-";
     public string SourceZipPath { get; }
     public bool HasWarning { get; }
     public string? WarningMessage { get; }
     public string Subtitle => string.IsNullOrWhiteSpace(Description) ? $"{Author} - {Name}" : $"{Author} - {Description}";
     public bool HasMultipleVersions => AvailableVersions.Count > 1;
+    public bool HasSingleVersion => !HasMultipleVersions;
+    public bool IsUsingOlderVersion => HasMultipleVersions &&
+        !string.Equals(SelectedVersion, NewestVersion, StringComparison.OrdinalIgnoreCase);
+    public string OlderVersionToolTip => $"Selected version is older than latest available version {NewestVersion}.";
 
     public bool IsSelected
     {
@@ -55,6 +60,13 @@ public sealed class EditableModViewModel : ViewModelBase
     public string SelectedVersion
     {
         get => _selectedVersion;
-        set => SetProperty(ref _selectedVersion, value);
+        set
+        {
+            if (SetProperty(ref _selectedVersion, value))
+            {
+                OnPropertyChanged(nameof(IsUsingOlderVersion));
+                OnPropertyChanged(nameof(OlderVersionToolTip));
+            }
+        }
     }
 }
