@@ -433,6 +433,7 @@
                   <Button Classes="primary" Content="Activate" Command="{Binding ActivateSelectedCommand}" IsEnabled="{Binding CanActivateSelected}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding IsEditMode}">
+                  <Button Content="Import" Command="{Binding ApplyCurrentToSelectedCommand}" ToolTip.Tip="Overwrite list with current game mods" />
                   <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
                   <Button Classes="primary" Content="Save" Command="{Binding SaveEditCommand}" />
                 </StackPanel>

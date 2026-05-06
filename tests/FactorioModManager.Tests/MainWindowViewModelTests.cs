@@ -197,6 +197,41 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task ApplyCurrentToSelectedCommand_can_import_while_editing_selected_list()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(
+            Path.Combine(temp.Path, FactorioFileNames.ModListJson),
+            """{"mods":[{"name":"base","enabled":true},{"name":"current-mod","enabled":true}]}""");
+        File.WriteAllBytes(Path.Combine(temp.Path, FactorioFileNames.ModSettingsDat), [9, 9, 9]);
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "current-mod_1.0.0.zip"), "current-mod", "Current Mod", "1.0.0");
+        ModScannerTests.CreateZip(Path.Combine(temp.Path, "draft-mod_1.0.0.zip"), "draft-mod", "Draft Mod", "1.0.0");
+        var targetFolder = CreateManagedList(temp.Path, "Target", "Target description", "draft-mod");
+        File.WriteAllBytes(Path.Combine(targetFolder, FactorioFileNames.ModSettingsDat), [1]);
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings { LastModsFolderPath = temp.Path });
+        var viewModel = CreateViewModel(new TestDialogService(), appSettingsService);
+
+        await viewModel.InitializeAsync();
+        viewModel.SelectedModList = viewModel.ModLists.Single(list => list.Name == "Target");
+        viewModel.EditSelectedCommand.Execute(null);
+
+        Assert.True(viewModel.IsEditMode);
+        Assert.True(viewModel.ApplyCurrentToSelectedCommand.CanExecute(null));
+
+        await viewModel.ApplyCurrentToSelectedCommand.ExecuteAsync();
+
+        Assert.False(viewModel.IsEditMode);
+        Assert.Equal([9, 9, 9], File.ReadAllBytes(Path.Combine(targetFolder, FactorioFileNames.ModSettingsDat)));
+        Assert.Equal(["current-mod"], new ModListReader().ReadSelectedMods(targetFolder));
+        Assert.Equal("Target", viewModel.SelectedModList?.Name);
+        var selectedMod = Assert.Single(viewModel.SelectedMods);
+        Assert.Equal("current-mod", selectedMod.Name);
+    }
+
+    [Fact]
     public async Task ApplyCurrentToSelectedCommand_requires_selected_list()
     {
         using var temp = new TempDirectory();

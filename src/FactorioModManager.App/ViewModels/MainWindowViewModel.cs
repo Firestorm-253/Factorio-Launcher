@@ -88,7 +88,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         CancelEditCommand = new RelayCommand(CancelEdit, () => IsEditMode);
         EditSelectedCommand = new RelayCommand(EditSelected, () => SelectedModList is not null && IsNormalMode);
         DuplicateSelectedCommand = new RelayCommand(DuplicateSelected, () => SelectedModList is not null && IsNormalMode);
-        ApplyCurrentToSelectedCommand = new AsyncRelayCommand(ApplyCurrentToSelectedAsync, () => SelectedModList is not null && IsNormalMode);
+        ApplyCurrentToSelectedCommand = new AsyncRelayCommand(ApplyCurrentToSelectedAsync, () => SelectedModList is not null);
         ActivateSelectedCommand = new AsyncRelayCommand(ActivateSelectedAsync, () => CanActivateSelected);
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync, () => SelectedModList is not null && IsNormalMode);
         ShowListsCommand = new RelayCommand(() => ActiveTab = "Lists");
@@ -996,6 +996,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             _modListFileManager.ApplyRootFilesToManagedList(ModsFolderPath!, item.FolderPath);
             StatusMessage = $"Imported current root files to {item.Name}.";
+            if (IsEditMode)
+            {
+                FinishEditing();
+            }
+
             await RefreshAsync();
             SelectedModList = _allModListItems.FirstOrDefault(list =>
                 string.Equals(list.Name, item.Name, StringComparison.OrdinalIgnoreCase));
