@@ -13,6 +13,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly FolderValidator _folderValidator;
     private readonly FactorioInstallLocator _factorioInstallLocator;
     private readonly IFactorioGameLauncher _factorioGameLauncher;
+    private readonly IFactorioGameRunningDetector _factorioGameRunningDetector;
     private readonly ModScanner _modScanner;
     private readonly ModListDetector _modListDetector;
     private readonly ModListReader _modListReader = new();
@@ -48,6 +49,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int _draftSelectedCount;
     private string _draftSizeLabel = "-";
     private string? _activeListName;
+    private bool _isFactorioRunning;
 
     public MainWindowViewModel(
         IDialogService dialogService,
@@ -55,6 +57,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         FolderValidator folderValidator,
         FactorioInstallLocator factorioInstallLocator,
         IFactorioGameLauncher factorioGameLauncher,
+        IFactorioGameRunningDetector factorioGameRunningDetector,
         ModScanner modScanner,
         ModListDetector modListDetector,
         ModListWriter modListWriter,
@@ -71,6 +74,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _folderValidator = folderValidator;
         _factorioInstallLocator = factorioInstallLocator;
         _factorioGameLauncher = factorioGameLauncher;
+        _factorioGameRunningDetector = factorioGameRunningDetector;
         _modScanner = modScanner;
         _modListDetector = modListDetector;
         _modListWriter = modListWriter;
@@ -86,9 +90,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         LaunchFactorioCommand = new AsyncRelayCommand(LaunchFactorioAsync, () => CanLaunchFactorio);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => IsFolderValid);
         CreateModListCommand = new RelayCommand(StartCreateDraft, () => IsFolderValid && IsNormalMode);
-        SaveEditCommand = new AsyncRelayCommand(SaveEditAsync, () => IsEditMode);
+        SaveEditCommand = new AsyncRelayCommand(SaveEditAsync, () => CanSaveEdit);
         CancelEditCommand = new RelayCommand(CancelEdit, () => IsEditMode);
-        EditSelectedCommand = new RelayCommand(EditSelected, () => SelectedModList is not null && IsNormalMode);
+        EditSelectedCommand = new RelayCommand(EditSelected, () => CanEditSelected);
         DuplicateSelectedCommand = new RelayCommand(DuplicateSelected, () => SelectedModList is not null && IsNormalMode);
         ImportCurrentToDraftCommand = new AsyncRelayCommand(ImportCurrentToDraftAsync, () => IsEditMode);
         ActivateSelectedCommand = new AsyncRelayCommand(ActivateSelectedAsync, () => CanActivateSelected);
@@ -169,11 +173,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public bool CanLaunchFactorio => _factorioGameLauncher.CanLaunch(FactorioInstallFolderPath);
+    public bool CanLaunchFactorio => !IsFactorioRunning && _factorioGameLauncher.CanLaunch(FactorioInstallFolderPath);
 
     public string LaunchFactorioToolTip => CanLaunchFactorio
         ? "Start Factorio"
-        : "Factorio executable was not found in the selected installation folder.";
+        : IsFactorioRunning
+            ? "Factorio is already running."
+            : "Factorio executable was not found in the selected installation folder.";
 
     public string FolderStatus
     {
@@ -234,6 +240,10 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SelectedListDescription));
                 OnPropertyChanged(nameof(SelectedListSummary));
                 OnPropertyChanged(nameof(CanActivateSelected));
+                OnPropertyChanged(nameof(CanEditSelected));
+                OnPropertyChanged(nameof(EditSelectedToolTip));
+                OnPropertyChanged(nameof(ActivateSelectedToolTip));
+                OnPropertyChanged(nameof(CanSaveEdit));
                 RaiseSelectionCommandStates();
                 if (!IsEditMode)
                 {
@@ -258,6 +268,10 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsNormalMode));
                 OnPropertyChanged(nameof(IsEditorVisible));
                 OnPropertyChanged(nameof(CanActivateSelected));
+                OnPropertyChanged(nameof(CanEditSelected));
+                OnPropertyChanged(nameof(CanSaveEdit));
+                OnPropertyChanged(nameof(EditSelectedToolTip));
+                OnPropertyChanged(nameof(ActivateSelectedToolTip));
                 SaveEditCommand.RaiseCanExecuteChanged();
                 CancelEditCommand.RaiseCanExecuteChanged();
                 ImportCurrentToDraftCommand.RaiseCanExecuteChanged();
@@ -374,7 +388,38 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string DraftSummaryLabel => $"{DraftSelectedCount} mods selected - {DraftSizeLabel}";
 
     public bool HasActiveList => !string.IsNullOrWhiteSpace(ActiveListName);
-    public bool CanActivateSelected => SelectedModList is not null && !SelectedModList.IsActive && IsNormalMode;
+    public bool IsFactorioRunning
+    {
+        get => _isFactorioRunning;
+        private set
+        {
+            if (SetProperty(ref _isFactorioRunning, value))
+            {
+                OnPropertyChanged(nameof(CanLaunchFactorio));
+                OnPropertyChanged(nameof(LaunchFactorioToolTip));
+                OnPropertyChanged(nameof(CanActivateSelected));
+                OnPropertyChanged(nameof(ActivateSelectedToolTip));
+                OnPropertyChanged(nameof(CanEditSelected));
+                OnPropertyChanged(nameof(EditSelectedToolTip));
+                OnPropertyChanged(nameof(CanSaveEdit));
+                LaunchFactorioCommand.RaiseCanExecuteChanged();
+                SaveEditCommand.RaiseCanExecuteChanged();
+                RaiseSelectionCommandStates();
+            }
+        }
+    }
+
+    public bool CanActivateSelected => SelectedModList is not null && !SelectedModList.IsActive && IsNormalMode && !IsFactorioRunning;
+    public string ActivateSelectedToolTip => IsFactorioRunning
+        ? "Close Factorio before activating a different mod list."
+        : "Activate mod list";
+    public bool CanEditSelected => SelectedModList is not null && IsNormalMode && !(IsFactorioRunning && SelectedModList.IsActive);
+    public string EditSelectedToolTip => SelectedModList is null
+        ? "Select a mod list to edit."
+        : IsFactorioRunning && SelectedModList.IsActive
+            ? "Close Factorio before editing the active mod list."
+            : "Edit mod list";
+    public bool CanSaveEdit => IsEditMode && !(!_isCreating && SelectedModList?.IsActive == true && IsFactorioRunning);
 
     public string? ActiveListName
     {
@@ -416,6 +461,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _settings = await _appSettingsService.LoadAsync();
         ModsFolderPath = _settings.LastModsFolderPath;
         FactorioInstallFolderPath = _settings.FactorioInstallFolderPath;
+        RefreshFactorioRunningState();
         ValidateFolder();
         await AutoDetectFactorioInstallFolderAsync();
 
@@ -473,6 +519,13 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task LaunchFactorioAsync()
     {
+        RefreshFactorioRunningState();
+        if (IsFactorioRunning)
+        {
+            await _dialogService.ShowErrorAsync("Launch failed", "Factorio is already running.");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(FactorioInstallFolderPath))
         {
             await _dialogService.ShowErrorAsync("Launch failed", "Select a Factorio installation folder before starting the game.");
@@ -482,6 +535,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         try
         {
             _factorioGameLauncher.Launch(FactorioInstallFolderPath);
+            IsFactorioRunning = true;
             StatusMessage = "Started Factorio.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -525,6 +579,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private async Task RefreshAsync()
     {
         ErrorMessage = null;
+        RefreshFactorioRunningState();
         ValidateFolder();
         if (!IsFolderValid || string.IsNullOrWhiteSpace(ModsFolderPath))
         {
@@ -623,6 +678,14 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void StartEdit(ModListItemViewModel item)
     {
+        RefreshFactorioRunningState();
+        if (IsFactorioRunning && item.IsActive)
+        {
+            ErrorMessage = "Close Factorio before editing the active mod list.";
+            StatusMessage = "Editing the active mod list is blocked while Factorio is running.";
+            return;
+        }
+
         SelectedModList = item;
         _isCreating = false;
         _duplicateSourceFolderPath = null;
@@ -671,6 +734,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (!EnsureWorkspace())
         {
+            return;
+        }
+
+        RefreshFactorioRunningState();
+        if (!_isCreating && SelectedModList?.IsActive == true && IsFactorioRunning)
+        {
+            await _dialogService.ShowErrorAsync(
+                "Save blocked",
+                "Close Factorio before saving changes to the active mod list.");
             return;
         }
 
@@ -899,6 +971,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (!EnsureWorkspace())
         {
+            return;
+        }
+
+        RefreshFactorioRunningState();
+        if (IsFactorioRunning && !item.IsActive)
+        {
+            await _dialogService.ShowErrorAsync(
+                "Activation blocked",
+                "Close Factorio before activating a different mod list.");
             return;
         }
 
@@ -1464,11 +1545,20 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void RaiseSelectionCommandStates()
     {
         OnPropertyChanged(nameof(CanActivateSelected));
+        OnPropertyChanged(nameof(ActivateSelectedToolTip));
+        OnPropertyChanged(nameof(CanEditSelected));
+        OnPropertyChanged(nameof(EditSelectedToolTip));
+        OnPropertyChanged(nameof(CanSaveEdit));
         EditSelectedCommand.RaiseCanExecuteChanged();
         DuplicateSelectedCommand.RaiseCanExecuteChanged();
         ImportCurrentToDraftCommand.RaiseCanExecuteChanged();
         ActivateSelectedCommand.RaiseCanExecuteChanged();
         DeleteSelectedCommand.RaiseCanExecuteChanged();
+    }
+
+    public void RefreshFactorioRunningState()
+    {
+        IsFactorioRunning = _factorioGameRunningDetector.IsRunning();
     }
 
     private bool EnsureWorkspace()

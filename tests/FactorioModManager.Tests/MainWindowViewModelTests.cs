@@ -643,11 +643,62 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.LaunchFactorioCommand.CanExecute(null));
     }
 
+    [Fact]
+    public async Task Running_game_blocks_play_active_edit_and_different_activation()
+    {
+        using var temp = new TempDirectory();
+        using var installTemp = new TempDirectory();
+        var activeFolder = CreateManagedList(temp.Path, "ActivePack", "Active list", "space-exploration");
+        CreateManagedList(temp.Path, "OtherPack", "Other list");
+        CopyListFilesToRoot(temp.Path, activeFolder);
+        Directory.CreateDirectory(Path.Combine(installTemp.Path, "data"));
+
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+        var appSettingsService = new AppSettingsService(settingsPath);
+        await appSettingsService.SaveAsync(new AppSettings
+        {
+            LastModsFolderPath = temp.Path,
+            ActiveModListFolderPath = activeFolder,
+            FactorioInstallFolderPath = installTemp.Path
+        });
+        var dialogs = new TestDialogService();
+        var gameStateDetector = new FakeFactorioGameRunningDetector { IsRunningResult = true };
+        var viewModel = CreateViewModel(
+            dialogs,
+            appSettingsService,
+            factorioGameLauncher: new FakeFactorioGameLauncher { CanLaunchResult = true },
+            gameStateDetector: gameStateDetector);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.IsFactorioRunning);
+        Assert.False(viewModel.CanLaunchFactorio);
+        Assert.False(viewModel.LaunchFactorioCommand.CanExecute(null));
+        Assert.Equal("Factorio is already running.", viewModel.LaunchFactorioToolTip);
+
+        viewModel.SelectedModList = viewModel.ModLists.Single(list => list.Name == "ActivePack");
+
+        Assert.False(viewModel.EditSelectedCommand.CanExecute(null));
+        Assert.Contains("Close Factorio", viewModel.EditSelectedToolTip);
+
+        viewModel.SelectedModList = viewModel.ModLists.Single(list => list.Name == "OtherPack");
+
+        Assert.False(viewModel.CanActivateSelected);
+        Assert.False(viewModel.ActivateSelectedCommand.CanExecute(null));
+        Assert.Contains("Close Factorio", viewModel.ActivateSelectedToolTip);
+
+        await viewModel.ActivateSelectedCommand.ExecuteAsync();
+
+        Assert.DoesNotContain(dialogs.Errors, error => error.StartsWith("Activation failed", StringComparison.Ordinal));
+        Assert.Equal("ActivePack", viewModel.ActiveListName);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         TestDialogService dialogService,
         AppSettingsService appSettingsService,
         FactorioInstallLocator? factorioInstallLocator = null,
-        IFactorioGameLauncher? factorioGameLauncher = null)
+        IFactorioGameLauncher? factorioGameLauncher = null,
+        IFactorioGameRunningDetector? gameStateDetector = null)
     {
         var modInfoReader = new ModInfoReader();
         var modListReader = new ModListReader();
@@ -658,6 +709,7 @@ public sealed class MainWindowViewModelTests
             new FolderValidator(),
             factorioInstallLocator ?? new FactorioInstallLocator([], []),
             factorioGameLauncher ?? new FakeFactorioGameLauncher(),
+            gameStateDetector ?? new FakeFactorioGameRunningDetector(),
             new ModScanner(modInfoReader),
             new ModListDetector(modListReader, metadataService),
             new ModListWriter(),
@@ -688,6 +740,16 @@ public sealed class MainWindowViewModelTests
         public void Launch(string installFolderPath)
         {
             LaunchedInstallFolderPath = installFolderPath;
+        }
+    }
+
+    private sealed class FakeFactorioGameRunningDetector : IFactorioGameRunningDetector
+    {
+        public bool IsRunningResult { get; set; }
+
+        public bool IsRunning()
+        {
+            return IsRunningResult;
         }
     }
 

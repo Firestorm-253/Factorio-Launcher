@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using FactorioModManager.App.Factorio;
 using FactorioModManager.App.Services;
 using FactorioModManager.App.ViewModels;
@@ -31,6 +32,7 @@ public sealed partial class App : Application
                 new FolderValidator(),
                 new FactorioInstallLocator(),
                 new FactorioGameLauncher(),
+                new FactorioGameRunningDetector(),
                 new ModScanner(modInfoReader),
                 new ModListDetector(modListReader, modListMetadataService),
                 new ModListWriter(),
@@ -44,6 +46,13 @@ public sealed partial class App : Application
 
             window.DataContext = viewModel;
             window.Opened += async (_, _) => await viewModel.InitializeAsync();
+            var gameStateTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2)
+            };
+            gameStateTimer.Tick += (_, _) => viewModel.RefreshFactorioRunningState();
+            window.Opened += (_, _) => gameStateTimer.Start();
+            window.Closed += (_, _) => gameStateTimer.Stop();
             desktop.MainWindow = window;
         }
 
