@@ -234,8 +234,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _selectedModList;
         set
         {
+            var previousSelection = _selectedModList;
             if (SetProperty(ref _selectedModList, value))
             {
+                if (previousSelection is not null)
+                {
+                    previousSelection.IsSelected = false;
+                }
+
+                if (_selectedModList is not null)
+                {
+                    _selectedModList.IsSelected = true;
+                }
+
                 OnPropertyChanged(nameof(HasSelectedModList));
                 OnPropertyChanged(nameof(SelectedListName));
                 OnPropertyChanged(nameof(SelectedListDescription));
