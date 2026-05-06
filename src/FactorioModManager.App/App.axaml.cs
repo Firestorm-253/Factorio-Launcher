@@ -50,7 +50,7 @@ public sealed partial class App : Application
             {
                 Interval = TimeSpan.FromSeconds(2)
             };
-            gameStateTimer.Tick += (_, _) => viewModel.RefreshFactorioRunningState();
+            gameStateTimer.Tick += async (_, _) => await viewModel.PollFactorioRunningStateAsync();
             window.Opened += (_, _) => gameStateTimer.Start();
             window.Closed += (_, _) => gameStateTimer.Stop();
             desktop.MainWindow = window;

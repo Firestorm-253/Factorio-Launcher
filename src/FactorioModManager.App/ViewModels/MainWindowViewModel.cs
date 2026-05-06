@@ -50,6 +50,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _draftSizeLabel = "-";
     private string? _activeListName;
     private bool _isFactorioRunning;
+    private bool _isHandlingFactorioClosed;
 
     public MainWindowViewModel(
         IDialogService dialogService,
@@ -596,12 +597,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             LoadInstalledMods();
 
             var detectedModLists = _modListDetector.Detect(ModsFolderPath).ToList();
-            var activeFolderPath = await GetValidatedRememberedActiveFolderPathAsync(detectedModLists);
+            var activeValidation = await GetValidatedRememberedActiveFolderPathAsync(detectedModLists);
+            if (activeValidation.ImportedRootFiles)
+            {
+                detectedModLists = _modListDetector.Detect(ModsFolderPath).ToList();
+            }
 
             _allModListItems.Clear();
             foreach (var modList in ApplySavedModListOrder(detectedModLists))
             {
-                var isActive = PathsEqual(activeFolderPath, modList.FolderPath);
+                var isActive = PathsEqual(activeValidation.ActiveFolderPath, modList.FolderPath);
                 _allModListItems.Add(new ModListItemViewModel(
                     modList,
                     isActive,
@@ -1449,22 +1454,57 @@ public sealed class MainWindowViewModel : ViewModelBase
         DraftSizeLabel = CalculateSelectedSizeLabel(selected);
     }
 
-    private async Task<string?> GetValidatedRememberedActiveFolderPathAsync(IReadOnlyList<ModList> detectedModLists)
+    private async Task<(string? ActiveFolderPath, bool ImportedRootFiles)> GetValidatedRememberedActiveFolderPathAsync(IReadOnlyList<ModList> detectedModLists)
     {
         var rememberedFolderPath = _settings.ActiveModListFolderPath;
         if (string.IsNullOrWhiteSpace(rememberedFolderPath) || string.IsNullOrWhiteSpace(ModsFolderPath))
         {
-            return null;
+            return (null, false);
         }
 
         var rememberedList = detectedModLists.FirstOrDefault(list => PathsEqual(list.FolderPath, rememberedFolderPath));
         if (rememberedList is not null && _activeModListDetector.IsActive(ModsFolderPath, rememberedList.FolderPath))
         {
-            return rememberedList.FolderPath;
+            return (rememberedList.FolderPath, false);
+        }
+
+        if (rememberedList is not null)
+        {
+            var imported = await PromptToImportRootFilesIntoInvalidActiveListAsync(rememberedList);
+            if (imported)
+            {
+                return (rememberedList.FolderPath, true);
+            }
         }
 
         await ClearRememberedActiveListAsync();
-        return null;
+        return (null, false);
+    }
+
+    private async Task<bool> PromptToImportRootFilesIntoInvalidActiveListAsync(ModList rememberedList)
+    {
+        var confirmed = await _dialogService.ConfirmAsync(
+            "Active list changed",
+            $"{rememberedList.Name} no longer matches the current Factorio mod-list.json and mod-settings.dat. Import the current game files into this active list?",
+            "Import");
+        if (!confirmed)
+        {
+            StatusMessage = "Active list was marked inactive.";
+            return false;
+        }
+
+        try
+        {
+            _modListFileManager.ApplyRootFilesToManagedList(ModsFolderPath!, rememberedList.FolderPath);
+            StatusMessage = $"Imported current game files into active list {rememberedList.Name}.";
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ErrorMessage = ex.Message;
+            await _dialogService.ShowErrorAsync("Import failed", ex.Message);
+            return false;
+        }
     }
 
     private async Task RememberActiveListAsync(string modListFolderPath)
@@ -1561,6 +1601,26 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void RefreshFactorioRunningState()
     {
         IsFactorioRunning = _factorioGameRunningDetector.IsRunning();
+    }
+
+    public async Task PollFactorioRunningStateAsync()
+    {
+        var wasRunning = IsFactorioRunning;
+        RefreshFactorioRunningState();
+        if (!wasRunning || IsFactorioRunning || _isHandlingFactorioClosed)
+        {
+            return;
+        }
+
+        _isHandlingFactorioClosed = true;
+        try
+        {
+            await RefreshAsync();
+        }
+        finally
+        {
+            _isHandlingFactorioClosed = false;
+        }
     }
 
     private bool EnsureWorkspace()
